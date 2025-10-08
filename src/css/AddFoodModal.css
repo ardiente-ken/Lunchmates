@@ -1,0 +1,44 @@
+/* Backdrop fade */
+.modal-backdrop-custom {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0);
+  z-index: 1040;
+  opacity: 0;
+  transition: background 0.3s ease, opacity 0.3s ease;
+}
+
+.modal-backdrop-custom.show {
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 1;
+}
+
+/* Modal fade */
+.fade-custom {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(-15px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fade-custom.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ✅ Wider modal */
+.modal-wide {
+  max-width: 800px; /* Default Bootstrap is ~500px */
+  width: 90%;       /* Keeps it responsive */
+}
+
+/* Optional — adjust modal-content padding */
+.modal-content {
+  border-radius: 12px;
+  overflow: hidden;
+}
