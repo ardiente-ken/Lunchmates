@@ -1,16 +1,34 @@
-# React + Vite
+# NPAX Food Ordering Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A dashboard for NPAX HR to manage food orders from suppliers and track employee requests.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 1. Food Management
+- HR can add and manage the list of available foods from the supplier.
+- Each food item includes:
+  - **Name**
+  - **Price**
 
-## React Compiler
+### 2. Cut-Off Time
+- HR can set a **cut-off time** for orders.
+- After the cut-off time, all orders are final and cannot be changed by employees.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 3. User Orders
+- Employees can place orders for available food items, specifying quantities.
+- Orders can only be made or modified before the cut-off time.
 
-## Expanding the ESLint configuration
+### 4. Order Summary
+- HR can view a **table of all users who ordered food** with details of their orders.
+- HR can also see a **summary of total quantities** for each food item to send to the supplier.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 5. Dashboard Overview
+- Quick overview of total users, orders, revenue, and pending actions.
+- Live clock and user account actions (e.g., logout).
+
+### 6. Interactive Modals
+- Smooth pop-up windows for:
+  - Adding/editing foods
+  - Setting cut-off times
+  - Viewing order summaries
+- Confirmations for actions like deleting food or logging out.
