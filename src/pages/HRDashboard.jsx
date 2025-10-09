@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import Swal from "sweetalert2";
+import axios from "axios";
 
 import TopNavbar from "../components/TopNavbar";
 import FoodModal from "../components/FoodModal";
@@ -15,14 +16,14 @@ const HRDashboard = () => {
     const [foodName, setFoodName] = useState("");
     const [price, setPrice] = useState("");
     const [showModal, setShowModal] = useState(false);
-    const [modalMode, setModalMode] = useState("add"); // "add" | "edit"
+    const [modalMode, setModalMode] = useState("add");
     const [updateIndex, setUpdateIndex] = useState(null);
 
-    const [cutOffTime, setCutOffTime] = useState("00:00");
+    const [cutOffTime, setCutOffTime] = useState(""); // fetched from DB
     const [showCutOffModal, setShowCutOffModal] = useState(false);
     const [showOrders, setShowOrders] = useState(false);
 
-    // Sample Orders
+    // Sample orders
     const sampleOrders = [
         {
             user: "John Doe",
@@ -41,14 +42,30 @@ const HRDashboard = () => {
         },
     ];
 
-    // Escape key closes modal
+    // Fetch today's cut-off from API
+    const fetchCutOff = async () => {
+        try {
+            const response = await axios.get("http://localhost:5000/api/cutoff");
+            if (response.data.cutOff && response.data.cutOff.co_time) {
+                setCutOffTime(response.data.cutOff.co_time);
+            }
+        } catch (err) {
+            console.error("❌ Failed to fetch cut-off:", err);
+        }
+    };
+
+    useEffect(() => {
+        fetchCutOff();
+    }, []);
+
+    // Escape key closes food modal
     useEffect(() => {
         const onKey = (e) => e.key === "Escape" && setShowModal(false);
         if (showModal) window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
     }, [showModal]);
 
-    // Add / Update / Delete Handlers
+    // Food CRUD handlers
     const handleAddFood = (e) => {
         e.preventDefault();
         if (!foodName.trim() || price === "") return;
@@ -57,7 +74,13 @@ const HRDashboard = () => {
 
         setFoods((prev) => [...prev, { name: foodName.trim(), price: p.toFixed(2) }]);
         resetModal();
-        Swal.fire({ icon: "success", title: "Food Added!", text: `${foodName} added successfully.`, timer: 1800, showConfirmButton: false });
+        Swal.fire({
+            icon: "success",
+            title: "Food Added!",
+            text: `${foodName} added successfully.`,
+            timer: 1800,
+            showConfirmButton: false,
+        });
     };
 
     const handleUpdateFood = (e) => {
@@ -70,7 +93,13 @@ const HRDashboard = () => {
             prev.map((item, idx) => (idx === updateIndex ? { name: foodName.trim(), price: p.toFixed(2) } : item))
         );
         resetModal();
-        Swal.fire({ icon: "success", title: "Food Updated!", text: `${foodName} updated successfully.`, timer: 1800, showConfirmButton: false });
+        Swal.fire({
+            icon: "success",
+            title: "Food Updated!",
+            text: `${foodName} updated successfully.`,
+            timer: 1800,
+            showConfirmButton: false,
+        });
     };
 
     const handleDelete = (idx) => {
@@ -85,7 +114,13 @@ const HRDashboard = () => {
         }).then((result) => {
             if (result.isConfirmed) {
                 setFoods((prev) => prev.filter((_, i) => i !== idx));
-                Swal.fire({ icon: "success", title: "Deleted!", text: "The food has been removed.", timer: 1500, showConfirmButton: false });
+                Swal.fire({
+                    icon: "success",
+                    title: "Deleted!",
+                    text: "The food has been removed.",
+                    timer: 1500,
+                    showConfirmButton: false,
+                });
             }
         });
     };
@@ -101,7 +136,6 @@ const HRDashboard = () => {
             confirmButtonText: "Yes, submit it!",
         }).then((result) => {
             if (result.isConfirmed) {
-                // Here you can also call any API or logic for submission
                 Swal.fire({
                     icon: "success",
                     title: "Menu Submitted!",
@@ -113,7 +147,6 @@ const HRDashboard = () => {
         });
     };
 
-    // Open Modals
     const handleOpenUpdate = (index) => {
         const item = foods[index];
         setFoodName(item.name);
@@ -135,6 +168,53 @@ const HRDashboard = () => {
         setUpdateIndex(null);
         setShowModal(false);
     };
+
+    // Handle saving cut-off
+    const handleSaveCutOff = async (time) => {
+        try {
+            const today = new Date().toISOString().split("T")[0];
+            const formattedTime = time.length === 5 ? `${time}:00` : time;
+
+            const response = await axios.post("http://localhost:5000/api/cutoff", {
+                date: today,
+                time: formattedTime,
+            });
+
+            setCutOffTime(formattedTime);
+
+            Swal.fire({
+                icon: "success",
+                title: "Cut-Off Time Set!",
+                text: response.data.message,
+                timer: 1500,
+                showConfirmButton: false,
+            });
+            fetchCutOff(); // <-- call the fetch function here
+
+        } catch (err) {
+            console.error("❌ Cut-off error:", err);
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: err.response?.data?.message || "Server error",
+            });
+        }
+    };
+
+    function convertTo12H(isoString) {
+        if (!isoString) return "--:--";
+
+        // Extract time part (HH:MM) from ISO string
+        const timePart = isoString.substring(11, 16); // "17:34"
+        const [hourStr, minute] = timePart.split(":");
+        let hour = parseInt(hourStr, 10);
+
+        const ampm = hour >= 12 ? "PM" : "AM";
+        hour = hour % 12;
+        if (hour === 0) hour = 12; // midnight or noon
+
+        return `${hour}:${minute} ${ampm}`;
+    }
 
     return (
         <div className="d-flex" style={{ minHeight: "100vh" }}>
@@ -158,11 +238,7 @@ const HRDashboard = () => {
                         <div className="col-md-6">
                             <div className="card shadow-sm border-0 p-3 text-center">
                                 <h6>Cut Off Time</h6>
-                                <h3>
-                                    {cutOffTime
-                                        ? new Date(`${new Date().toISOString().split("T")[0]}T${cutOffTime}`).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                                        : "--:--"}
-                                </h3>
+                                <h3>{cutOffTime ? convertTo12H(cutOffTime) : "--:--"}</h3>
                                 <button className="btn btn-outline-success btn-sm mt-2" onClick={() => setShowCutOffModal(true)}>
                                     <i className="fas fa-clock me-1"></i> Set Cut Off Time
                                 </button>
@@ -176,12 +252,11 @@ const HRDashboard = () => {
                             <FoodList
                                 foods={foods}
                                 handleOpenAdd={handleOpenAdd}
-                                handleSubmitMenu={handleSubmitMenu} // or handleSubmitMenu if different
+                                handleSubmitMenu={handleSubmitMenu}
                                 handleOpenUpdate={handleOpenUpdate}
                                 handleDelete={handleDelete}
                             />
                         </div>
-
                         <div className="col-md-4 mb-4">
                             <OrderSummary />
                         </div>
@@ -189,7 +264,6 @@ const HRDashboard = () => {
                 </div>
             </div>
 
-            {/* Modals */}
             <FoodModal
                 show={showModal}
                 onClose={() => setShowModal(false)}
@@ -203,13 +277,16 @@ const HRDashboard = () => {
 
             <CutOffModal
                 show={showCutOffModal}
-                onClose={() => setShowCutOffModal(false)}
-                currentTime={cutOffTime}
-                onSave={(time) => {
-                    setCutOffTime(time);
-                    Swal.fire({ icon: "success", title: "Cut-Off Time Set!", text: `New cut-off time: ${time}`, timer: 1500, showConfirmButton: false });
+                onSave={handleSaveCutOff}
+
+                onClose={async () => {
+                    setShowCutOffModal(false);
+
+                    fetchCutOff();
                 }}
+                currentTime={cutOffTime}
             />
+
 
             <Orders show={showOrders} onClose={() => setShowOrders(false)} orders={sampleOrders} />
         </div>
