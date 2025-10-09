@@ -35,7 +35,9 @@ const TopNavbar = () => {
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsed = JSON.parse(storedUser);
+      console.log("👤 Loaded user:", parsed);
+      setUser(parsed);
     }
   }, []);
 
@@ -80,10 +82,14 @@ const TopNavbar = () => {
     });
   };
 
+  const displayName = user
+    ? `${user.firstName || user.um_firstName || ""} ${user.lastName || user.um_lastName || ""}`.trim()
+    : "User";
+
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4">
       <span className="navbar-brand mb-0 h5">
-        Hello, {user ? user.um_firstName + " " + user.um_lastName : "User"} 👋
+        Hello, {displayName || "User"} 👋
       </span>
 
       <div className="ms-auto d-flex align-items-center position-relative" ref={dropdownRef}>

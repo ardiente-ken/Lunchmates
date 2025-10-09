@@ -14,27 +14,54 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
 
+    console.log("=======================================");
+    console.log("🟦 [LOGIN ATTEMPT - FRONTEND]");
+    console.log("➡️ Username:", username);
+    console.log("➡️ Password:", password ? "(hidden)" : "(empty)");
+    console.log("=======================================");
+
     try {
-      const response = await axios.post("http://localhost:5000/api/users/login", {
-        username,
-        password,
-      });
+      console.log("🌐 Sending POST request to backend...");
+      const response = await axios.post(
+        "http://localhost:5000/api/users/login",
+        { username, password },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          validateStatus: (status) => true, // allow handling all status codes manually
+        }
+      );
+
+      console.log("📥 [BACKEND RESPONSE]");
+      console.log("➡️ Status:", response.status);
+      console.log("➡️ Data:", response.data);
+
+      if (response.status !== 200) {
+        console.warn("⚠️ Non-200 response:", response.data);
+        throw new Error(response.data?.message || "Login failed");
+      }
 
       const user = response.data.user;
-      localStorage.setItem("user", JSON.stringify(user)); // save session
+      console.log("👤 [USER DATA RECEIVED]:", user);
+
+      localStorage.setItem("user", JSON.stringify(user));
 
       Swal.fire({
         icon: "success",
         title: "Welcome!",
-        text: `Hello ${user.um_firstName}!`,
+        text: `Hello ${user.firstName || user.um_firstName}!`,
         timer: 1500,
         showConfirmButton: false,
       });
 
-      // redirect based on user type
-      if (user.um_userType.toLowerCase() === "hr") {
+      // Redirect based on role
+      const userType = (user.userType || user.um_userType || "").toLowerCase();
+      console.log("🔀 Redirecting based on userType:", userType);
+
+      if (userType === "hr") {
         navigate("/hr");
-      } else if (user.um_userType.toLowerCase() === "employee") {
+      } else if (userType === "employee") {
         navigate("/user");
       } else {
         Swal.fire({
@@ -43,13 +70,22 @@ const LoginPage = () => {
           text: "Please contact admin for access.",
         });
       }
+
     } catch (err) {
+      console.error("❌ [LOGIN ERROR]:", err);
+      console.log("➡️ Full error object:", JSON.stringify(err, null, 2));
+
       Swal.fire({
         icon: "error",
         title: "Login Failed",
-        text: err.response?.data?.message || "Server error. Please try again.",
+        text:
+          err.response?.data?.message ||
+          err.message ||
+          "Server error. Please try again.",
       });
     } finally {
+      console.log("✅ Login attempt complete");
+      console.log("=======================================");
       setLoading(false);
     }
   };

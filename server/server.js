@@ -6,14 +6,31 @@ import userRoutes from "./routes/userRoutes.js";
 dotenv.config();
 const app = express();
 
-// ✅ These must be before your routes
-app.use(cors());
-app.use(express.json());  // <--- this is critical
-app.use(express.urlencoded({ extended: true })); // optional, for form data
+// ✅ CORS setup
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
-// ROUTES
+// ✅ Express 5+ safe CORS preflight handler
+app.options(/.*/, (req, res) => {
+  res.header("Access-Control-Allow-Origin", "http://localhost:5173");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.sendStatus(204);
+});
+
+// ✅ JSON parser middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ✅ Routes
 app.use("/api/users", userRoutes);
 
-app.listen(process.env.PORT || 5000, () =>
-  console.log(`✅ Server running on port ${process.env.PORT}`)
-);
+// ✅ Start server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
