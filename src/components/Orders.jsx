@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
-import "../css/AddFoodModal.css"; // reuse fade/transition styles if you already have them
+import "../css/AddFoodModal.css";
 
 const Orders = ({ show, onClose, orders }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -14,6 +14,28 @@ const Orders = ({ show, onClose, orders }) => {
   }, [show]);
 
   if (!show) return null;
+
+  // Copy table content to clipboard
+  const handleCopyToClipboard = () => {
+    if (!orders || orders.length === 0) return;
+
+    let text = "Orders List\n\n";
+    orders.forEach((order, idx) => {
+      text += `${idx + 1}. ${order.user} (${order.email})\n`;
+      order.items.forEach((item) => {
+        text += `   - ${item.name} — ₱${item.price} × ${item.qty}\n`;
+      });
+      text += `Total: ₱${order.total}\n\n`;
+    });
+
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        alert("Orders copied to clipboard!");
+      })
+      .catch((err) => {
+        console.error("Failed to copy:", err);
+      });
+  };
 
   return (
     <>
@@ -88,6 +110,9 @@ const Orders = ({ show, onClose, orders }) => {
 
             {/* Footer */}
             <div className="modal-footer">
+              <button type="button" className="btn btn-success" onClick={handleCopyToClipboard}>
+                Copy to Clipboard
+              </button>
               <button type="button" className="btn btn-secondary" onClick={onClose}>
                 Close
               </button>

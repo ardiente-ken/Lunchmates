@@ -1,123 +1,161 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import Swal from "sweetalert2";
+
+import TopNavbar from "../components/TopNavbar";
+import Orders from "../components/Orders";
+import UserOrder from "../components/UserOrder";
+import MenuUser from "../components/MenuUser";
 
 const UserDashboard = () => {
+  const [foods, setFoods] = useState([
+    { name: "Burger", price: 120 },
+    { name: "Fries", price: 60 },
+    { name: "Pizza", price: 250 },
+    { name: "Pasta", price: 150 },
+    { name: "Salad", price: 80 },
+    { name: "Salad", price: 80 },
+    { name: "Salad", price: 80 },
+    { name: "Salad", price: 80 },
+  ]);
+
+  const [cutOffTime, setCutOffTime] = useState("00:00");
+  const [showOrders, setShowOrders] = useState(false);
+  const [orders, setOrders] = useState([]);
+
+  // Escape key closes modal (if needed)
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && setShowOrders(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Delete item from orders
+  const handleDelete = (foodName) => {
+    const food = orders.find((o) => o.name === foodName);
+    if (!food) return;
+
+    Swal.fire({
+      title: "Are you sure?",
+      text: `This will remove ${food.name} from your order.`,
+      icon: "warning",
+      showCancelButton: true,
+      cancelButtonColor: "#6c757d",
+      confirmButtonColor: "#d33",
+      confirmButtonText: "Remove",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        setOrders((prev) => prev.filter((o) => o.name !== foodName));
+        Swal.fire({
+          icon: "success",
+          title: "Removed!",
+          text: `${food.name} has been removed from your order.`,
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      }
+    });
+  };
+
+  // Add / remove quantity in orders
+  const addToOrder = (food) => {
+    const existing = orders.find((item) => item.name === food.name);
+    if (existing) {
+      const newQty = existing.qty + (food.qty || 1);
+      if (newQty > 0) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.name === food.name ? { ...o, qty: newQty } : o
+          )
+        );
+      } else {
+        setOrders((prev) => prev.filter((o) => o.name !== food.name));
+      }
+    } else if ((food.qty || 1) > 0) {
+      setOrders((prev) => [...prev, { ...food, qty: food.qty || 1 }]);
+    }
+  };
+
+  // Submit order
+  const handleSubmitMenu = () => {
+    if (orders.length === 0) {
+      Swal.fire({
+        icon: "info",
+        title: "No Items",
+        text: "Please add items to your order first.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      return;
+    }
+    Swal.fire({
+      title: "Are you sure?",
+      text: "Do you want to submit your order?",
+      icon: "question",
+      showCancelButton: true,
+      cancelButtonColor: "#6c757d",
+      confirmButtonColor: "#28a745",
+      confirmButtonText: "Yes, submit it!",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        Swal.fire({
+          icon: "success",
+          title: "Order Submitted!",
+          text: "Your order has been submitted successfully.",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      }
+    });
+  };
+
   return (
-    <div className="d-flex" style={{ minHeight: "100vh" }}>
-      {/* Sidebar */}
-      <nav
-        className="bg-dark text-white p-3 d-flex flex-column"
-        style={{ width: "250px" }}
-      >
-        <h4 className="text-center mb-4">📊 Dashboard</h4>
-        <ul className="nav flex-column">
-          <li className="nav-item mb-2">
-            <a href="#" className="nav-link text-white">
-              <i className="fas fa-home me-2"></i> Home
-            </a>
-          </li>
-          <li className="nav-item mb-2">
-            <a href="#" className="nav-link text-white">
-              <i className="fas fa-chart-bar me-2"></i> Analytics
-            </a>
-          </li>
-          <li className="nav-item mb-2">
-            <a href="#" className="nav-link text-white">
-              <i className="fas fa-box me-2"></i> Inventory
-            </a>
-          </li>
-          <li className="nav-item mb-2">
-            <a href="#" className="nav-link text-white">
-              <i className="fas fa-users me-2"></i> Users
-            </a>
-          </li>
-          <li className="nav-item">
-            <a href="#" className="nav-link text-white">
-              <i className="fas fa-cog me-2"></i> Settings
-            </a>
-          </li>
-        </ul>
-      </nav>
-
-      {/* Main Content */}
+    <div className="d-flex" style={{ maxHeight: "100vh", overflowY: "hidden" }}>
+      {/* Left Column */}
       <div className="flex-grow-1 bg-light">
-        {/* Top Navbar */}
-        <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4">
-          <span className="navbar-brand mb-0 h5">Welcome, Admin 👋</span>
-          <div className="ms-auto">
-            <button className="btn btn-outline-primary btn-sm me-2">
-              <i className="fas fa-bell"></i>
-            </button>
-            <button className="btn btn-outline-secondary btn-sm">
-              <i className="fas fa-user-circle"></i>
-            </button>
-          </div>
-        </nav>
-
-        {/* Dashboard Body */}
+        <TopNavbar />
         <div className="container-fluid p-4">
-          <h4 className="mb-4">Overview</h4>
+          <h4 className="mb-4">Food Order Imnida</h4>
 
-          {/* Stats Cards */}
-          <div className="row">
-            <div className="col-md-3 mb-4">
-              <div className="card shadow-sm border-0 p-3">
-                <h6>Total Users</h6>
-                <h3>1,240</h3>
-                <i className="fas fa-users text-primary fa-2x"></i>
-              </div>
-            </div>
-            <div className="col-md-3 mb-4">
-              <div className="card shadow-sm border-0 p-3">
-                <h6>Orders</h6>
-                <h3>560</h3>
-                <i className="fas fa-box text-success fa-2x"></i>
-              </div>
-            </div>
-            <div className="col-md-3 mb-4">
-              <div className="card shadow-sm border-0 p-3">
-                <h6>Revenue</h6>
-                <h3>$12,400</h3>
-                <i className="fas fa-dollar-sign text-warning fa-2x"></i>
-              </div>
-            </div>
-            <div className="col-md-3 mb-4">
-              <div className="card shadow-sm border-0 p-3">
-                <h6>Pending</h6>
-                <h3>24</h3>
-                <i className="fas fa-clock text-danger fa-2x"></i>
-              </div>
-            </div>
-          </div>
-
-          {/* Placeholder for Charts */}
-          <div className="row">
-            <div className="col-md-8 mb-4">
-              <div className="card shadow-sm border-0 p-4">
-                <h6>Sales Chart</h6>
-                <div
-                  className="bg-light border rounded d-flex align-items-center justify-content-center"
-                  style={{ height: "250px" }}
-                >
-                  <p className="text-muted">[ Chart Placeholder ]</p>
+          <div className="row" style={{ height: "calc(100vh - 80px)" }}>
+            <div className="col-md-8 d-flex flex-column">
+              {/* Cut Off Time */}
+              <div className="mb-4">
+                <div className="card shadow-sm border-0 p-3 text-center">
+                  <h6><i className="fas fa-clock me-2"></i> Cut Off Time</h6>
+                  <h3>
+                    {cutOffTime
+                      ? new Date(`${new Date().toISOString().split("T")[0]}T${cutOffTime}`)
+                        .toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                      : "--:--"}
+                  </h3>
                 </div>
               </div>
+
+              {/* Menu */}
+              <div className="flex-grow-1 overflow-auto">
+                <MenuUser
+                  foods={foods}
+                  orders={orders}
+                  onAddToOrder={addToOrder}
+                  handleDelete={handleDelete}
+                  handleSubmitMenu={handleSubmitMenu}
+                />
+              </div>
             </div>
-            <div className="col-md-4 mb-4">
-              <div className="card shadow-sm border-0 p-4">
-                <h6>Recent Activities</h6>
-                <ul className="list-unstyled mt-3">
-                  <li>🟢 New user registered</li>
-                  <li>🟡 Order #1042 pending</li>
-                  <li>🔵 Server backup completed</li>
-                  <li>🟠 New message received</li>
-                </ul>
+
+            {/* Right Column */}
+            <div className="col-md-4 d-flex flex-column">
+              <div className="flex-grow-1">
+                <UserOrder orders={orders} clearOrders={() => setOrders([])} />
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <Orders show={showOrders} onClose={() => setShowOrders(false)} orders={orders} />
     </div>
   );
 };
