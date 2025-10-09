@@ -25,10 +25,17 @@ const ProtectedRoute = ({ children, allowedRole }) => {
   // Handle both possible property names
   const userRole = (user.userType || user.um_userType || "").toLowerCase();
 
+  // Map role to dashboard path
+  const dashboards = {
+    hr: "/hr-dashboard",
+    employee: "/user-dashboard",
+  };
+
   // 🚫 Logged in but wrong role
   if (allowedRole && userRole !== allowedRole.toLowerCase()) {
     console.warn(`🚫 Access denied. User role: ${userRole}, Required: ${allowedRole}`);
-    return <Navigate to="/" replace />;
+    // Redirect them to their own dashboard if they're logged in but wrong page
+    return <Navigate to={dashboards[userRole] || "/"} replace />;
   }
 
   // ✅ Authorized access

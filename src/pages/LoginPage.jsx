@@ -60,9 +60,9 @@ const LoginPage = () => {
       console.log("🔀 Redirecting based on userType:", userType);
 
       if (userType === "hr") {
-        navigate("/hr");
+        navigate("/hr-dashboard");
       } else if (userType === "employee") {
-        navigate("/user");
+        navigate("/user-dashboard");
       } else {
         Swal.fire({
           icon: "warning",

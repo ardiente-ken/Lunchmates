@@ -12,7 +12,7 @@ function App() {
 
         {/* Employee Dashboard (only for Employee users) */}
         <Route
-          path="/user"
+          path="/user-dashboard"
           element={
             <ProtectedRoute allowedRole="Employee">
               <UserDashboard />
@@ -22,7 +22,7 @@ function App() {
 
         {/* HR Dashboard (only for HR users) */}
         <Route
-          path="/hr"
+          path="/hr-dashboard"
           element={
             <ProtectedRoute allowedRole="HR">
               <HRDashboard />
