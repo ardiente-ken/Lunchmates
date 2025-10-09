@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import Swal from "sweetalert2";
+import { useNavigate } from "react-router-dom";
 
 const ClockDisplay = () => {
   const [time, setTime] = useState(new Date());
@@ -26,7 +27,17 @@ const ClockDisplay = () => {
 
 const TopNavbar = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [user, setUser] = useState(null);
   const dropdownRef = useRef(null);
+  const navigate = useNavigate();
+
+  // ✅ Load user info from localStorage
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
   // ✅ Close dropdown when clicking outside
   useEffect(() => {
@@ -39,9 +50,41 @@ const TopNavbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // ✅ Logout Function
+  const handleLogout = () => {
+    Swal.fire({
+      title: "Are you sure?",
+      text: "You will be logged out of the system.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#6c757d",
+      confirmButtonText: "Yes, logout",
+      cancelButtonText: "Cancel",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        localStorage.removeItem("user");
+
+        Swal.fire({
+          icon: "success",
+          title: "Logged out",
+          text: "You have been logged out successfully.",
+          timer: 1200,
+          showConfirmButton: false,
+        });
+
+        setTimeout(() => {
+          navigate("/");
+        }, 1200);
+      }
+    });
+  };
+
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4">
-      <span className="navbar-brand mb-0 h5">Welcome, Admin 👋</span>
+      <span className="navbar-brand mb-0 h5">
+        Hello, {user ? user.um_firstName + " " + user.um_lastName : "User"} 👋
+      </span>
 
       <div className="ms-auto d-flex align-items-center position-relative" ref={dropdownRef}>
         {/* Live Clock */}
@@ -65,33 +108,11 @@ const TopNavbar = () => {
               transition: "opacity 0.2s ease",
             }}
           >
-            <button
-              className="dropdown-item text-danger"
-              onClick={() => {
-                Swal.fire({
-                  title: "Are you sure?",
-                  text: "You will be logged out of the system.",
-                  icon: "warning",
-                  showCancelButton: true,
-                  confirmButtonColor: "#d33",
-                  cancelButtonColor: "#6c757d",
-                  confirmButtonText: "Yes, logout",
-                  cancelButtonText: "Cancel",
-                }).then((result) => {
-                  if (result.isConfirmed) {
-                    // ✅ Perform logout action here
-                    console.log("Logging out...");
-                    // For example: redirect or clear session
-                    // window.location.href = "/login";
-                  }
-                });
-              }}
-            >
+            <button className="dropdown-item text-danger" onClick={handleLogout}>
               <i className="fas fa-sign-out-alt me-2"></i> Logout
             </button>
           </div>
         )}
-
       </div>
     </nav>
   );

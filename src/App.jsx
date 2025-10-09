@@ -1,13 +1,37 @@
-import './css/global.css'
-import HRDashboard from '../src/pages/HRDashboard'
-import UserDashboard from './pages/UserDashboard'
-function App() {
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import LoginPage from "./pages/LoginPage";
+import UserDashboard from "./pages/UserDashboard";
+import HRDashboard from "./pages/HRDashboard";
+import ProtectedRoute from "./components/ProtectedRoute";
 
+function App() {
   return (
-    <>
-      <UserDashboard />
-    </>
-  )
+    <Router>
+      <Routes>
+        <Route path="/" element={<LoginPage />} />
+
+        {/* Employee Dashboard (only for Employee users) */}
+        <Route
+          path="/user"
+          element={
+            <ProtectedRoute allowedRole="Employee">
+              <UserDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* HR Dashboard (only for HR users) */}
+        <Route
+          path="/hr"
+          element={
+            <ProtectedRoute allowedRole="HR">
+              <HRDashboard />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </Router>
+  );
 }
 
-export default App
+export default App;
