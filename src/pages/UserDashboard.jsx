@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import Swal from "sweetalert2";
+import axios from "axios";
 
 import TopNavbar from "../components/TopNavbar";
 import Orders from "../components/Orders";
@@ -15,14 +16,29 @@ const UserDashboard = () => {
     { name: "Pizza", price: 250 },
     { name: "Pasta", price: 150 },
     { name: "Salad", price: 80 },
-    { name: "Salad", price: 80 },
-    { name: "Salad", price: 80 },
-    { name: "Salad", price: 80 },
   ]);
 
-  const [cutOffTime, setCutOffTime] = useState("00:00");
+  const [cutOffTime, setCutOffTime] = useState(""); // Dynamic cut-off
   const [showOrders, setShowOrders] = useState(false);
   const [orders, setOrders] = useState([]);
+
+  // Fetch today's cut-off from API
+  const fetchCutOff = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/api/cutoff");
+      if (response.data.cutOff && response.data.cutOff.co_time) {
+        setCutOffTime(response.data.cutOff.co_time);
+      }
+    } catch (err) {
+      console.error("❌ Failed to fetch cut-off:", err);
+      setCutOffTime(""); // fallback
+    }
+  };
+
+  // Fetch cut-off on mount
+  useEffect(() => {
+    fetchCutOff();
+  }, []);
 
   // Escape key closes modal (if needed)
   useEffect(() => {
@@ -65,9 +81,7 @@ const UserDashboard = () => {
       const newQty = existing.qty + (food.qty || 1);
       if (newQty > 0) {
         setOrders((prev) =>
-          prev.map((o) =>
-            o.name === food.name ? { ...o, qty: newQty } : o
-          )
+          prev.map((o) => (o.name === food.name ? { ...o, qty: newQty } : o))
         );
       } else {
         setOrders((prev) => prev.filter((o) => o.name !== food.name));
@@ -106,9 +120,28 @@ const UserDashboard = () => {
           timer: 1500,
           showConfirmButton: false,
         });
+
+        // Optionally re-fetch cut-off after order submit
+        fetchCutOff();
       }
     });
   };
+  // Helper function
+  function convertTo12H(isoString) {
+    if (!isoString) return "--:--";
+
+    // Extract time part (HH:MM) from ISO string
+    const timePart = isoString.substring(11, 16); // "17:34"
+    const [hourStr, minute] = timePart.split(":");
+    let hour = parseInt(hourStr, 10);
+
+    const ampm = hour >= 12 ? "PM" : "AM";
+    hour = hour % 12;
+    if (hour === 0) hour = 12; // midnight or noon
+
+    return `${hour}:${minute} ${ampm}`;
+  }
+
 
   return (
     <div className="d-flex" style={{ maxHeight: "100vh", overflowY: "hidden" }}>
@@ -123,13 +156,10 @@ const UserDashboard = () => {
               {/* Cut Off Time */}
               <div className="mb-4">
                 <div className="card shadow-sm border-0 p-3 text-center">
-                  <h6><i className="fas fa-clock me-2"></i> Cut Off Time</h6>
-                  <h3>
-                    {cutOffTime
-                      ? new Date(`${new Date().toISOString().split("T")[0]}T${cutOffTime}`)
-                        .toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                      : "--:--"}
-                  </h3>
+                  <h6>
+                    <i className="fas fa-clock me-2"></i> Cut Off Time
+                  </h6>
+                  <h3>{cutOffTime ? convertTo12H(cutOffTime) : "--:--"}</h3>
                 </div>
               </div>
 
