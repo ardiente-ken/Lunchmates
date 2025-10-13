@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import Swal from "sweetalert2";
 import axios from "axios";
 
-const UserOrder = ({ userId, localOrders = [], setLocalOrders, onOrderCancelled }) => {
+const UserOrder = ({ userId, localOrders = [], setLocalOrders, onOrderCancelled, disabled }) => {
   const [dbOrders, setDbOrders] = useState([]);
   const [submitted, setSubmitted] = useState(false);
 
@@ -184,13 +184,18 @@ const UserOrder = ({ userId, localOrders = [], setLocalOrders, onOrderCancelled 
         <button
           className={`btn flex-grow-1 ${submitted ? "btn-warning" : "btn-success"} btn-md`}
           onClick={handleSubmitMenu}
+          disabled={disabled} // ✅ disables the button if disabled prop is true
         >
           <i className={`fas ${submitted ? "fa-edit" : "fa-check"} me-1`}></i>
           {submitted ? "Update Order" : "Submit Order"}
         </button>
 
         {submitted && (
-          <button className="btn btn-danger btn-md" onClick={handleCancelOrder}>
+          <button
+            className="btn btn-danger btn-md"
+            onClick={handleCancelOrder}
+            disabled={disabled} // ✅ disables the cancel button too
+          >
             <i className="fas fa-times me-1"></i> Cancel
           </button>
         )}

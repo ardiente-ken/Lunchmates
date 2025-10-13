@@ -27,13 +27,19 @@ const UserDashboard = () => {
     const checkCutOff = () => {
       const now = new Date();
       const cutOff = new Date(cutOffTime);
-      setIsCutOffPassed(now >= cutOff);
+
+      // Extract hours and minutes
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const cutOffMinutes = cutOff.getUTCHours() * 60 + cutOff.getUTCMinutes(); // use getUTCHours if your cutoff is UTC
+
+      setIsCutOffPassed(nowMinutes >= cutOffMinutes);
     };
 
     checkCutOff();
-    const interval = setInterval(checkCutOff, 60 * 1000); // ⏱ check every minute
+    const interval = setInterval(checkCutOff, 30 * 1000); // check every minute
     return () => clearInterval(interval);
   }, [cutOffTime]);
+
 
 
   // 🕓 Fetch today's cut-off time
@@ -143,7 +149,7 @@ const UserDashboard = () => {
         </div>
       </div>
 
-      <Orders show={showOrders} orders={combinedOrders} />
+      <Orders show={showOrders} orders={combinedOrders} disabled={isCutOffPassed} />
     </div>
   );
 };
