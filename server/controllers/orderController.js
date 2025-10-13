@@ -322,8 +322,9 @@ export const cancelOrder = async (req, res) => {
 
 export const getEmployeeOrdersToday = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool(); // ✅ use the shared pool from db.config.js
 
+    // 🧾 Detailed orders
     const result = await pool.request().query(`
       SELECT 
         u.um_userid AS userId,
@@ -333,21 +334,41 @@ export const getEmployeeOrdersToday = async (req, res) => {
         od.od_orderItemName AS itemName,
         od.od_orderItemPrice AS price,
         od.od_qty AS qty,
-        SUM(od.od_orderItemPrice * od.od_qty) OVER (PARTITION BY u.um_userid) AS totalPerUser
+        (
+          SELECT SUM(od2.od_orderItemPrice * od2.od_qty)
+          FROM T_OrderHeader oh2
+          INNER JOIN T_OrderDetail od2 ON oh2.oh_orderID = od2.od_orderID
+          WHERE oh2.oh_userID = u.um_userid
+          AND CAST(oh2.oh_orderDate AS DATE) = CAST(GETDATE() AS DATE)
+        ) AS totalPerUser
       FROM T_UserMaster u
-      LEFT JOIN T_OrderHeader oh
+      INNER JOIN T_OrderHeader oh
         ON u.um_userid = oh.oh_userID
         AND CAST(oh.oh_orderDate AS DATE) = CAST(GETDATE() AS DATE)
-      LEFT JOIN T_OrderDetail od
+      INNER JOIN T_OrderDetail od
         ON oh.oh_orderID = od.od_orderID
-      WHERE (od.od_qty > 0 OR od.od_qty IS NULL)
+      WHERE od.od_qty > 0
         AND u.um_usertype = 'Employee'
       ORDER BY u.um_firstname;
     `);
 
-    res.status(200).json(result.recordset);
+    // 🧮 Count unique employees who ordered today
+    const countResult = await pool.request().query(`
+      SELECT COUNT(DISTINCT oh.oh_userID) AS employeeCount
+      FROM T_OrderHeader oh
+      INNER JOIN T_UserMaster u ON u.um_userid = oh.oh_userID
+      WHERE u.um_usertype = 'Employee'
+        AND CAST(oh.oh_orderDate AS DATE) = CAST(GETDATE() AS DATE)
+    `);
+
+    res.status(200).json({
+      employeeCount: countResult.recordset[0].employeeCount,
+      orders: result.recordset,
+    });
   } catch (error) {
     console.error("Error fetching employee orders:", error);
     res.status(500).json({ message: "Error fetching employee orders", error });
   }
 };
+
+

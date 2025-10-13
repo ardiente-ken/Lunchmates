@@ -24,23 +24,23 @@ const HRDashboard = () => {
     const [showCutOffModal, setShowCutOffModal] = useState(false);
     const [showOrders, setShowOrders] = useState(false);
 
-    const sampleOrders = [
-        {
-            user: "John Doe",
-            email: "john@example.com",
-            items: [
-                { name: "Burger", price: 120, qty: 2 },
-                { name: "Fries", price: 60, qty: 1 },
-            ],
-            total: 300,
-        },
-        {
-            user: "Jane Smith",
-            email: "jane@example.com",
-            items: [{ name: "Pasta", price: 150, qty: 1 }],
-            total: 150,
-        },
-    ];
+    const [employeeCount, setEmployeeCount] = useState(0);
+
+    // 🧩 Fetch employee count only (no need to load all orders here)
+    const fetchEmployeeCount = async () => {
+        try {
+            const res = await axios.get("http://localhost:5000/api/orders/today/employees");
+            const { employeeCount = 0 } = res.data || {};
+            setEmployeeCount(employeeCount);
+        } catch (error) {
+            console.error("❌ Failed to fetch employee count:", error);
+        }
+    };
+
+    // Run once when page loads, then refresh every 60s
+    useEffect(() => {
+        fetchEmployeeCount();     
+    }, []);
 
     // --- FETCH DAILY MENU ---
     const fetchDailyMenu = async () => {
@@ -311,7 +311,7 @@ const HRDashboard = () => {
                         <div className="col-md-6">
                             <div className="card shadow-sm border-0 p-3 text-center">
                                 <h6>Orders</h6>
-                                <h3>560</h3>
+                                <h3>{employeeCount}</h3>
                                 <button
                                     className="btn btn-outline-success btn-sm mt-2"
                                     onClick={() => setShowOrders(true)}
@@ -373,7 +373,7 @@ const HRDashboard = () => {
                 currentTime={cutOffTime}
             />
 
-            <Orders show={showOrders} onClose={() => setShowOrders(false)} orders={sampleOrders} />
+            <Orders show={showOrders} onClose={() => setShowOrders(false)} />
         </div>
     );
 };
