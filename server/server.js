@@ -3,6 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import userRoutes from "./routes/userRoutes.js";
 import cutOffRoutes from "./routes/cutOffRoutes.js";
+import dailyMenuRoutes from "./routes/dailyMenuRoutes.js";
+import orderRoutes from "./routes/orderRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -32,6 +34,9 @@ app.use(express.urlencoded({ extended: true }));
 // ✅ Routes
 app.use("/api/users", userRoutes);
 app.use("/api/cutoff", cutOffRoutes);
+app.use("/api/dailymenu", dailyMenuRoutes);
+app.use("/api/orders", orderRoutes);
+
 
 // ✅ Start server
 const PORT = process.env.PORT || 5000;

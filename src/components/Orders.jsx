@@ -1,21 +1,61 @@
 import React, { useEffect, useState } from "react";
+import axios from "axios";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "../css/AddFoodModal.css";
 
-const Orders = ({ show, onClose, orders }) => {
+const Orders = ({ show, onClose }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [employeeCount, setEmployeeCount] = useState(0);
 
   useEffect(() => {
     if (show) {
       setTimeout(() => setIsVisible(true), 10);
+      fetchEmployeeOrders();
     } else {
       setIsVisible(false);
     }
   }, [show]);
 
-  if (!show) return null;
+  // 📡 Fetch today's employee orders + count
+  const fetchEmployeeOrders = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/orders/today/employees");
+      const { orders: data = [], employeeCount = 0 } = res.data || {};
 
-  // Copy table content to clipboard
+      // 🧩 Group orders by user
+      const grouped = Object.values(
+        data.reduce((acc, row) => {
+          const userId = row.userId;
+          if (!acc[userId]) {
+            acc[userId] = {
+              user: row.userName,
+              email: `${row.userName.toLowerCase()}@npax.com`,
+              total: row.totalPerUser || 0,
+              items: [],
+            };
+          }
+
+          if (row.itemName) {
+            acc[userId].items.push({
+              name: row.itemName,
+              price: row.price,
+              qty: row.qty,
+            });
+          }
+
+          return acc;
+        }, {})
+      );
+
+      setOrders(grouped);
+      setEmployeeCount(employeeCount);
+    } catch (error) {
+      console.error("❌ Failed to fetch employee orders:", error);
+    }
+  };
+
+  // 📋 Copy orders to clipboard
   const handleCopyToClipboard = () => {
     if (!orders || orders.length === 0) return;
 
@@ -28,14 +68,13 @@ const Orders = ({ show, onClose, orders }) => {
       text += `Total: ₱${order.total}\n\n`;
     });
 
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        alert("Orders copied to clipboard!");
-      })
-      .catch((err) => {
-        console.error("Failed to copy:", err);
-      });
+    navigator.clipboard
+      .writeText(text)
+      .then(() => alert("Orders copied to clipboard!"))
+      .catch((err) => console.error("Failed to copy:", err));
   };
+
+  if (!show) return null;
 
   return (
     <>
@@ -55,8 +94,13 @@ const Orders = ({ show, onClose, orders }) => {
         <div className="modal-dialog modal-dialog-centered modal-wide" role="document">
           <div className="modal-content">
             {/* Header */}
-            <div className="modal-header">
-              <h5 className="modal-title">Orders List</h5>
+            <div className="modal-header d-flex justify-content-between align-items-center">
+              <h5 className="modal-title">
+                Orders List
+                <span className="badge bg-success ms-2">
+                  {employeeCount} Employee{employeeCount !== 1 && "s"}
+                </span>
+              </h5>
               <button
                 type="button"
                 className="btn-close"
@@ -103,7 +147,7 @@ const Orders = ({ show, onClose, orders }) => {
                 </div>
               ) : (
                 <p className="text-center text-muted py-4 mb-0">
-                  No orders found.
+                  No orders found for today.
                 </p>
               )}
             </div>
