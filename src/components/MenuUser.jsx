@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
-const MenuUser = ({ userId, onOrderDraftChange, resetTrigger }) => {
+const MenuUser = ({ userId, onOrderDraftChange, resetTrigger, disabled }) => {
   const [foods, setFoods] = useState([]);
   const [draftOrders, setDraftOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -124,6 +124,7 @@ const MenuUser = ({ userId, onOrderDraftChange, resetTrigger }) => {
               <button
                 className="btn btn-sm btn-outline-secondary me-2"
                 onClick={() => decrement(food)}
+                disabled={disabled}
               >
                 -
               </button>
@@ -131,12 +132,14 @@ const MenuUser = ({ userId, onOrderDraftChange, resetTrigger }) => {
               <button
                 className="btn btn-sm btn-outline-success me-3"
                 onClick={() => increment(food)}
+                disabled={disabled}
               >
                 +
               </button>
               <button
                 className="btn btn-sm btn-danger"
                 onClick={() => removeFromOrder(food)}
+                disabled={disabled}
               >
                 <i className="fas fa-trash"></i>
               </button>
@@ -144,7 +147,15 @@ const MenuUser = ({ userId, onOrderDraftChange, resetTrigger }) => {
           </li>
         ))}
       </ul>
+      <br></br>
+      {disabled && (
+        <div className="alert alert-warning text-center py-2 mb-3">
+          Ordering is closed — the cut-off time has passed.
+        </div>
+      )}
+
     </div>
+
   );
 };
 

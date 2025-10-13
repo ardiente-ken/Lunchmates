@@ -372,3 +372,34 @@ export const getEmployeeOrdersToday = async (req, res) => {
 };
 
 
+export const getEmployeeOrderSummaryToday = async (req, res) => {
+  try {
+    const pool = await getPool();
+
+    const result = await pool.request().query(`
+      SELECT 
+        od.od_orderItemName AS itemName,
+        SUM(od.od_qty) AS totalQty,
+        SUM(od.od_orderItemPrice * od.od_qty) AS totalSales
+      FROM T_OrderHeader oh
+      INNER JOIN T_OrderDetail od ON oh.oh_orderID = od.od_orderID
+      INNER JOIN T_UserMaster u ON oh.oh_userID = u.um_userid
+      WHERE u.um_usertype = 'Employee'
+        AND CAST(oh.oh_orderDate AS DATE) = CAST(GETDATE() AS DATE)
+        AND od.od_qty > 0
+      GROUP BY od.od_orderItemName
+      ORDER BY od.od_orderItemName;
+    `);
+
+    res.status(200).json({
+      message: "Employee order summary fetched successfully",
+      summary: result.recordset,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching employee order summary:", error);
+    res.status(500).json({
+      message: "Error fetching employee order summary",
+      error: error.message,
+    });
+  }
+};

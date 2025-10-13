@@ -19,11 +19,22 @@ const UserDashboard = () => {
   const [fetchedOrders, setFetchedOrders] = useState([]); // from DB
   const [loading, setLoading] = useState(true);
   const [resetTrigger, setResetTrigger] = useState(false);
+  const [isCutOffPassed, setIsCutOffPassed] = useState(false);
 
-  const handleOrderCancelled = () => {
-    // Trigger a reset signal
-    setResetTrigger((prev) => !prev);
-  };
+  useEffect(() => {
+    if (!cutOffTime) return;
+
+    const checkCutOff = () => {
+      const now = new Date();
+      const cutOff = new Date(cutOffTime);
+      setIsCutOffPassed(now >= cutOff);
+    };
+
+    checkCutOff();
+    const interval = setInterval(checkCutOff, 60 * 1000); // ⏱ check every minute
+    return () => clearInterval(interval);
+  }, [cutOffTime]);
+
 
   // 🕓 Fetch today's cut-off time
   const fetchCutOff = async () => {
@@ -105,6 +116,7 @@ const UserDashboard = () => {
                   onOrderDraftChange={setDraftOrders}
                   existingOrders={fetchedOrders}
                   resetTrigger={resetTrigger}
+                  disabled={isCutOffPassed} // 🔒 pass here
                 />
               </div>
             </div>
@@ -121,9 +133,9 @@ const UserDashboard = () => {
                   <UserOrder
                     userId={userId}
                     localOrders={combinedOrders}
-                    onOrderCancelled={() => setResetTrigger(prev => !prev)} // 👈 important
+                    onOrderCancelled={() => setResetTrigger(prev => !prev)}
+                    disabled={isCutOffPassed} // 🔒 pass here
                   />
-
                 )}
               </div>
             </div>
