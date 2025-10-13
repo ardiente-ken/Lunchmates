@@ -13,48 +13,74 @@ const UserDashboard = () => {
   const storedUser = JSON.parse(localStorage.getItem("user"));
   const userId = storedUser?.userId || storedUser?.id || storedUser?.um_id;
 
-  const [draftOrders, setDraftOrders] = useState([]); // 🆕 local (unsaved) orders
   const [cutOffTime, setCutOffTime] = useState("");
   const [showOrders, setShowOrders] = useState(false);
+  const [draftOrders, setDraftOrders] = useState([]); // only what user adds manually
+  const [fetchedOrders, setFetchedOrders] = useState([]); // from DB
+  const [loading, setLoading] = useState(true);
+  const [resetTrigger, setResetTrigger] = useState(false);
+
+  const handleOrderCancelled = () => {
+    // Trigger a reset signal
+    setResetTrigger((prev) => !prev);
+  };
 
   // 🕓 Fetch today's cut-off time
   const fetchCutOff = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/api/cutoff");
-      if (response.data.cutOff && response.data.cutOff.co_time) {
-        setCutOffTime(response.data.cutOff.co_time);
-      }
+      const res = await axios.get("http://localhost:5000/api/cutoff");
+      setCutOffTime(res.data?.cutOff?.co_time || "");
     } catch (err) {
       console.error("❌ Failed to fetch cut-off:", err);
-      setCutOffTime("");
+    }
+  };
+
+  // 📦 Fetch user's existing orders from DB
+  const fetchUserOrders = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`http://localhost:5000/api/orders/${userId}`);
+      setFetchedOrders(res.data.orders || []);
+    } catch (err) {
+      console.error("❌ Failed to fetch orders:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchCutOff();
-  }, []);
+    fetchUserOrders();
+  }, [userId]);
 
-  // 🧭 Escape key closes modal (if needed)
+  // 🧭 Escape key closes modal (optional)
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && setShowOrders(false);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // 🕰 Convert ISO time to readable 12H
-  function convertTo12H(isoString) {
-    if (!isoString) return "--:--";
-    const timePart = isoString.substring(11, 16);
-    const [hourStr, minute] = timePart.split(":");
-    let hour = parseInt(hourStr, 10);
+  // ⏰ Convert ISO to 12H
+  const convertTo12H = (iso) => {
+    if (!iso) return "--:--";
+    const t = iso.substring(11, 16);
+    const [h, m] = t.split(":");
+    const hour = parseInt(h, 10);
     const ampm = hour >= 12 ? "PM" : "AM";
-    hour = hour % 12 || 12;
-    return `${hour}:${minute} ${ampm}`;
-  }
+    const twelveH = hour % 12 || 12;
+    return `${twelveH}:${m} ${ampm}`;
+  };
+
+  // 🧮 Combine only for display — without merging duplicates
+  const combinedOrders = [
+    ...fetchedOrders.filter(
+      (db) => !draftOrders.some((local) => local.food_id === db.food_id)
+    ),
+    ...draftOrders,
+  ];
 
   return (
     <div className="d-flex" style={{ maxHeight: "100vh", overflowY: "hidden" }}>
-      {/* Left Column */}
       <div className="flex-grow-1 bg-light">
         <TopNavbar />
         <div className="container-fluid p-4">
@@ -68,27 +94,44 @@ const UserDashboard = () => {
                   <h6>
                     <i className="fas fa-clock me-2"></i> Cut Off Time
                   </h6>
-                  <h3>{cutOffTime ? convertTo12H(cutOffTime) : "--:--"}</h3>
+                  <h3>{convertTo12H(cutOffTime)}</h3>
                 </div>
               </div>
 
               {/* Menu */}
               <div className="flex-grow-1 overflow-auto">
-                <MenuUser onOrderDraftChange={setDraftOrders} />
+                <MenuUser
+                  userId={userId}
+                  onOrderDraftChange={setDraftOrders}
+                  existingOrders={fetchedOrders}
+                  resetTrigger={resetTrigger}
+                />
               </div>
             </div>
 
             {/* Right Column */}
             <div className="col-md-4 d-flex flex-column">
               <div className="flex-grow-1">
-                <UserOrder userId={userId} localOrders={draftOrders} />
+                {loading ? (
+                  <div className="text-center mt-5">
+                    <div className="spinner-border text-secondary"></div>
+                    <p className="mt-2">Loading orders...</p>
+                  </div>
+                ) : (
+                  <UserOrder
+                    userId={userId}
+                    localOrders={combinedOrders}
+                    onOrderCancelled={() => setResetTrigger(prev => !prev)} // 👈 important
+                  />
+
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <Orders show={showOrders} orders={draftOrders} />
+      <Orders show={showOrders} orders={combinedOrders} />
     </div>
   );
 };
