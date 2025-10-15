@@ -5,14 +5,20 @@ import CutOff from "../model/cutoffModel.js";
  * Body: { time: "HH:MM:SS" }
  */
 export const setTodayCutOff = async (req, res) => {
-  const { time } = req.body;
+  const { time, updatedBy } = req.body; // <-- receive username from request
 
   console.log("🟦 Cut-Off request received");
   console.log("➡️ Time provided:", time);
+  console.log("➡️ Updated by:", updatedBy);
 
   if (!time) {
     console.warn("⚠️ Missing time in request");
     return res.status(400).json({ message: "Time is required" });
+  }
+
+  if (!updatedBy) {
+    console.warn("⚠️ Missing updatedBy in request");
+    return res.status(400).json({ message: "UpdatedBy is required" });
   }
 
   const todayStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
@@ -25,18 +31,24 @@ export const setTodayCutOff = async (req, res) => {
     if (cutOff) {
       // Update existing
       cutOff.co_time = time;
+      cutOff.co_lastupdatedby = updatedBy;
       await cutOff.save();
-      console.log(`✅ Cut-off updated for ${todayStr} to ${time}`);
+
       return res.status(200).json({
         message: `Cut-off time updated for today (${todayStr}) to ${time}`,
       });
     } else {
       // Create new
-      cutOff = new CutOff({ co_date: todayStr, co_time: time });
+      cutOff = new CutOff({
+        co_date: todayStr,
+        co_time: time,
+        co_lastupdatedby: updatedBy,
+      });
       await cutOff.save();
-      console.log(`✅ Cut-off set for ${todayStr} at ${time}`);
+
+      console.log(`✅ Cut-off set for ${todayStr} at ${time} by ${updatedBy}`);
       return res.status(201).json({
-        message: `Cut-off time set for today (${todayStr}) at ${time}`,
+        message: `Cut-off time set for today (${todayStr}) at ${time} by ${updatedBy}`,
       });
     }
   } catch (err) {
@@ -44,6 +56,7 @@ export const setTodayCutOff = async (req, res) => {
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
 
 /**
  * Get today's cut-off time

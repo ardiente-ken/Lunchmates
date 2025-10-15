@@ -10,6 +10,10 @@ const cutOffSchema = new mongoose.Schema({
     type: String, // store as "HH:MM:SS"
     required: true,
   },
+  co_lastupdatedby: {
+    type: String,
+    required: true,
+  }
 });
 
 export default mongoose.model("Cutoff", cutOffSchema)

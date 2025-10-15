@@ -28,17 +28,27 @@ const CutOffModal = ({ show, onClose, currentTime, onSave }) => {
     const today = new Date().toISOString().split("T")[0];
     console.log("➡️ Today's date:", today);
 
-    // Format time for SQL (HH:MM:SS)
+    // Format time for backend (HH:MM:SS)
     const formattedTime = selectedTime.length === 5 ? `${selectedTime}:00` : selectedTime;
     console.log("➡️ Formatted time to send:", formattedTime);
+
+    // Get logged-in user from localStorage
+    const storedUser = localStorage.getItem("user");
+    const loggedInUser = storedUser ? JSON.parse(storedUser) : null;
+    const updatedBy = loggedInUser
+      ? `${loggedInUser.um_firstName} ${loggedInUser.um_lastName}`
+      : "Unknown";
+    console.log("➡️ Updating cut-off as user:", updatedBy);
 
     try {
       const response = await axios.post(`${API_URL}/cutoff/set`, {
         date: today,
         time: formattedTime,
+        updatedBy, // <-- include user who updated
       });
 
       console.log("✅ API Response:", response.data);
+
       // Update parent state
       onSave(formattedTime);
 

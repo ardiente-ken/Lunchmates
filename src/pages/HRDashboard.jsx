@@ -270,9 +270,17 @@ const HRDashboard = () => {
             const today = new Date().toISOString().split("T")[0];
             const formattedTime = time.length === 5 ? `${time}:00` : time;
 
+            // Parse the stored user from localStorage
+            const storedUser = localStorage.getItem("user");
+            const loggedInUser = storedUser ? JSON.parse(storedUser) : null;
+            const updatedBy = loggedInUser
+                ? `${loggedInUser.um_firstName} ${loggedInUser.um_lastName}`
+                : "Unknown";
+
             const response = await axios.post(`${API_URL}/cutoff/set`, {
                 date: today,
                 time: formattedTime,
+                updatedBy, // <-- include the user who updated
             });
 
             setCutOffTime(formattedTime);
@@ -295,6 +303,7 @@ const HRDashboard = () => {
             });
         }
     };
+
 
     function convertTo12H(timeStr) {
         if (!timeStr) return "--:--";
