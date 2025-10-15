@@ -23,13 +23,14 @@ const LoginPage = () => {
     try {
       console.log("🌐 Sending POST request to backend...");
       const response = await axios.post(
-        "http://localhost:5000/api/users/login",
-        { username, password },
+        "http://localhost:8000/api/user/login",
         {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          validateStatus: (status) => true, // allow handling all status codes manually
+          um_username: username,
+          um_userPassword: password
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+          validateStatus: (status) => true
         }
       );
 

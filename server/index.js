@@ -1,0 +1,37 @@
+import express from "express";
+import mongoose from "mongoose";
+import bodyParser from "body-parser";
+import dotenv from "dotenv";
+import cors from "cors"; // ✅ import cors
+
+// Routes
+import route from "./routes/userRoute.js";
+
+// App
+const app = express();
+dotenv.config();
+
+// Enable CORS for all origins
+app.use(cors());
+
+// If you want to allow only specific origin:
+// app.use(cors({ origin: "http://localhost:3000" }));
+
+app.use(bodyParser.json());
+
+// MongoDB connection
+const PORT = process.env.PORT || 7000;
+const MONGOURL = process.env.MONGO_URL;
+
+mongoose
+  .connect(MONGOURL)
+  .then(() => {
+    console.log("DB Connected");
+    app.listen(PORT, () => {
+      console.log(`Server is Running on port: ${PORT}`);
+    });
+  })
+  .catch((error) => console.log(error));
+
+// Routes
+app.use("/api", route);
