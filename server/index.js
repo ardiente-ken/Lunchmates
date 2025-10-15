@@ -5,7 +5,8 @@ import dotenv from "dotenv";
 import cors from "cors"; // ✅ import cors
 
 // Routes
-import route from "./routes/userRoute.js";
+import userRoute from "./routes/userRoute.js";
+import cutOffRoute from "./routes/cutoffRoute.js";
 
 // App
 const app = express();
@@ -34,4 +35,5 @@ mongoose
   .catch((error) => console.log(error));
 
 // Routes
-app.use("/api", route);
+app.use("/api", userRoute);
+app.use("/api", cutOffRoute);

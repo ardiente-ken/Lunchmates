@@ -8,6 +8,7 @@ import TopNavbar from "../components/TopNavbar";
 import Orders from "../components/Orders";
 import UserOrder from "../components/UserOrder";
 import MenuUser from "../components/MenuUser";
+import { API_URL } from "../global";
 
 const UserDashboard = () => {
   const storedUser = JSON.parse(localStorage.getItem("user"));
@@ -45,7 +46,7 @@ const UserDashboard = () => {
   // 🕓 Fetch today's cut-off time
   const fetchCutOff = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/cutoff");
+      const res = await axios.get(`${API_URL}/cutoff/get`);
       setCutOffTime(res.data?.cutOff?.co_time || "");
     } catch (err) {
       console.error("❌ Failed to fetch cut-off:", err);
@@ -78,15 +79,16 @@ const UserDashboard = () => {
   }, []);
 
   // ⏰ Convert ISO to 12H
-  const convertTo12H = (iso) => {
-    if (!iso) return "--:--";
-    const t = iso.substring(11, 16);
-    const [h, m] = t.split(":");
-    const hour = parseInt(h, 10);
+  function convertTo12H(timeStr) {
+    if (!timeStr) return "--:--";
+    const [hourStr, minute] = timeStr.split(":");
+    let hour = parseInt(hourStr, 10);
+    if (isNaN(hour) || !minute) return "--:--"; // safeguard
     const ampm = hour >= 12 ? "PM" : "AM";
-    const twelveH = hour % 12 || 12;
-    return `${twelveH}:${m} ${ampm}`;
-  };
+    hour = hour % 12 || 12; // 0 → 12
+    return `${hour}:${minute} ${ampm}`;
+  }
+
 
   // 🧮 Combine only for display — without merging duplicates
   const combinedOrders = [

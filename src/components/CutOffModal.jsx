@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
+import { API_URL } from "../global";
 
 const CutOffModal = ({ show, onClose, currentTime, onSave }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -32,21 +33,12 @@ const CutOffModal = ({ show, onClose, currentTime, onSave }) => {
     console.log("➡️ Formatted time to send:", formattedTime);
 
     try {
-      const response = await axios.post("http://localhost:5000/api/cutoff", {
+      const response = await axios.post(`${API_URL}/cutoff/set`, {
         date: today,
         time: formattedTime,
       });
 
       console.log("✅ API Response:", response.data);
-
-      Swal.fire({
-        icon: "success",
-        title: "Cut-Off Time Set!",
-        text: response.data.message,
-        timer: 1500,
-        showConfirmButton: false,
-      });
-
       // Update parent state
       onSave(formattedTime);
 
@@ -54,12 +46,6 @@ const CutOffModal = ({ show, onClose, currentTime, onSave }) => {
       onClose();
     } catch (err) {
       console.error("❌ Cut-off error:", err);
-
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: err.response?.data?.message || "Server error",
-      });
     }
   };
 

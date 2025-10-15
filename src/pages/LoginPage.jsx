@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "../global.js"; // adjust path
+
 import "bootstrap/dist/css/bootstrap.min.css";
 
 const LoginPage = () => {
@@ -23,7 +25,7 @@ const LoginPage = () => {
     try {
       console.log("🌐 Sending POST request to backend...");
       const response = await axios.post(
-        "http://localhost:8000/api/user/login",
+        `${API_URL}/user/login`,
         {
           um_username: username,
           um_userPassword: password

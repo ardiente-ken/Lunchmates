@@ -4,7 +4,7 @@ import CutOff from "../model/cutoffModel.js";
  * Add or update cut-off time
  * Body: { time: "HH:MM:SS" }
  */
-export const upsertCutOff = async (req, res) => {
+export const setTodayCutOff = async (req, res) => {
   const { time } = req.body;
 
   console.log("🟦 Cut-Off request received");

@@ -5,6 +5,7 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import Swal from "sweetalert2";
 import axios from "axios";
 
+import { API_URL } from "../global";
 import TopNavbar from "../components/TopNavbar";
 import FoodModal from "../components/FoodModal";
 import CutOffModal from "../components/CutOffModal";
@@ -39,7 +40,7 @@ const HRDashboard = () => {
 
     // Run once when page loads, then refresh every 60s
     useEffect(() => {
-        fetchEmployeeCount();     
+        fetchEmployeeCount();
     }, []);
 
     // --- FETCH DAILY MENU ---
@@ -67,14 +68,21 @@ const HRDashboard = () => {
     // --- FETCH CUT-OFF TIME ---
     const fetchCutOff = async () => {
         try {
-            const response = await axios.get("http://localhost:5000/api/cutoff");
-            if (response.data.cutOff && response.data.cutOff.co_time) {
+            const response = await axios.get(`${API_URL}/cutoff/get`);
+            console.log("📥 Cut-Off API response:", response.data);
+
+            // Ensure cutOff exists and has a valid co_time
+            if (response.data && response.data.cutOff && response.data.cutOff.co_time) {
                 setCutOffTime(response.data.cutOff.co_time);
+                console.log("✅ Cut-off time set:", response.data.cutOff.co_time);
+            } else {
+                console.warn("⚠️ Cut-off data missing or invalid:", response.data);
             }
         } catch (err) {
             console.error("❌ Failed to fetch cut-off:", err);
         }
     };
+
 
     useEffect(() => {
         fetchCutOff();
@@ -262,7 +270,7 @@ const HRDashboard = () => {
             const today = new Date().toISOString().split("T")[0];
             const formattedTime = time.length === 5 ? `${time}:00` : time;
 
-            const response = await axios.post("http://localhost:5000/api/cutoff", {
+            const response = await axios.post(`${API_URL}/cutoff/set`, {
                 date: today,
                 time: formattedTime,
             });
@@ -288,14 +296,13 @@ const HRDashboard = () => {
         }
     };
 
-    function convertTo12H(isoString) {
-        if (!isoString) return "--:--";
-        const timePart = isoString.substring(11, 16);
-        let [hourStr, minute] = timePart.split(":");
+    function convertTo12H(timeStr) {
+        if (!timeStr) return "--:--";
+        const [hourStr, minute] = timeStr.split(":");
         let hour = parseInt(hourStr, 10);
+        if (isNaN(hour) || !minute) return "--:--"; // safeguard
         const ampm = hour >= 12 ? "PM" : "AM";
-        hour = hour % 12;
-        if (hour === 0) hour = 12;
+        hour = hour % 12 || 12; // 0 → 12
         return `${hour}:${minute} ${ampm}`;
     }
 
