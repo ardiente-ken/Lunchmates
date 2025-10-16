@@ -46,7 +46,7 @@ const HRDashboard = () => {
     // --- FETCH DAILY MENU ---
     const fetchDailyMenu = async () => {
         try {
-            const res = await axios.get("http://localhost:5000/api/dailymenu");
+            const res = await axios.get(`${API_URL}/daily-menu/get`);
             if (res.data.menu) {
                 setFoods(
                     res.data.menu.map((f) => ({
@@ -103,7 +103,7 @@ const HRDashboard = () => {
         if (isNaN(p)) return;
 
         try {
-            await axios.post("http://localhost:5000/api/dailymenu", {
+            await axios.post(`${API_URL}/daily-menu/set`, {
                 items: [{ itemName: foodName.trim(), itemPrice: p }],
             });
             Swal.fire({
@@ -134,10 +134,14 @@ const HRDashboard = () => {
         const oldFood = foods[updateIndex];
 
         try {
-            await axios.put("http://localhost:5000/api/dailymenu", {
-                oldItemName: oldFood.name,
+            // Today's date in YYYY-MM-DD
+            const today = new Date().toISOString().split("T")[0];
+
+            const response = await axios.put(`${API_URL}/daily-menu/update`, {
+                itemName: oldFood.name,   // current name in DB
+                date: today,              // always today
                 newItemName: foodName.trim(),
-                newItemPrice: p,
+                newItemPrice: price,
             });
             Swal.fire({
                 icon: "success",
@@ -171,8 +175,14 @@ const HRDashboard = () => {
         }).then(async (result) => {
             if (result.isConfirmed) {
                 try {
-                    await axios.delete("http://localhost:5000/api/dailymenu", {
-                        data: { itemName: food.name },
+                    // Today's date in YYYY-MM-DD
+                    const today = new Date().toISOString().split("T")[0];
+
+                    await axios.delete(`${API_URL}/daily-menu/delete`, {
+                        data: {
+                            itemName: food.name, // item to delete
+                            date: today          // always today
+                        },
                     });
                     Swal.fire({
                         icon: "success",
@@ -184,55 +194,6 @@ const HRDashboard = () => {
                     fetchDailyMenu(); // REFRESH FROM DB
                 } catch (err) {
                     console.error("❌ Delete food error:", err);
-                    Swal.fire({
-                        icon: "error",
-                        title: "Error",
-                        text: err.response?.data?.message || "Server error",
-                    });
-                }
-            }
-        });
-    };
-
-    const handleSubmitMenu = async () => {
-        if (foods.length === 0) {
-            Swal.fire({
-                icon: "info",
-                title: "No Items",
-                text: "Please add items to the menu first.",
-                timer: 1500,
-                showConfirmButton: false,
-            });
-            return;
-        }
-
-        Swal.fire({
-            title: "Are you sure?",
-            text: "Do you want to submit the menu?",
-            icon: "question",
-            showCancelButton: true,
-            cancelButtonColor: "#6c757d",
-            confirmButtonColor: "#28a745",
-            confirmButtonText: "Yes, submit it!",
-        }).then(async (result) => {
-            if (result.isConfirmed) {
-                try {
-                    await axios.post("http://localhost:5000/api/dailymenu", {
-                        items: foods.map((f) => ({
-                            itemName: f.name,
-                            itemPrice: parseFloat(f.price),
-                        })),
-                    });
-                    Swal.fire({
-                        icon: "success",
-                        title: "Menu Submitted!",
-                        text: "Menu saved successfully.",
-                        timer: 1500,
-                        showConfirmButton: false,
-                    });
-                    fetchDailyMenu(); // REFRESH FROM DB
-                } catch (err) {
-                    console.error("❌ Submit menu error:", err);
                     Swal.fire({
                         icon: "error",
                         title: "Error",
@@ -356,7 +317,6 @@ const HRDashboard = () => {
                                 foods={foods}
                                 setFoods={setFoods}
                                 handleOpenAdd={handleOpenAdd}
-                                handleSubmitMenu={handleSubmitMenu}
                                 handleOpenUpdate={handleOpenUpdate}
                                 handleDelete={handleDelete}
                             />

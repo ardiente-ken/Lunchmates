@@ -7,7 +7,8 @@ import cors from "cors"; // ✅ import cors
 // Routes
 import userRoute from "./routes/userRoute.js";
 import cutOffRoute from "./routes/cutoffRoute.js";
-
+import dailyMenuRoute from "./routes/dailyMenuRoute.js"
+import orderRoute from "./routes/orderRoute.js";
 // App
 const app = express();
 dotenv.config();
@@ -37,3 +38,5 @@ mongoose
 // Routes
 app.use("/api", userRoute);
 app.use("/api", cutOffRoute);
+app.use("/api", dailyMenuRoute);
+app.use("/api", orderRoute);

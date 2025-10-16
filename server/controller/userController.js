@@ -87,7 +87,8 @@ export const login = async (req, res) => {
         um_firstName: user.um_firstName,
         um_lastName: user.um_lastName,
         um_userType: user.um_userType,
-        um_username: user.um_username
+        um_username: user.um_username,
+        _id: user._id
       }
     });
 

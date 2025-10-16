@@ -1,14 +1,14 @@
 // FoodList.jsx
 import React, { useEffect } from "react";
 import axios from "axios";
-
-const FoodList = ({ foods, setFoods, handleOpenAdd, handleSubmitMenu, handleOpenUpdate, handleDelete }) => {
+import { API_URL } from "../global";
+const FoodList = ({ foods, setFoods, handleOpenAdd, handleOpenUpdate, handleDelete }) => {
 
     // Always fetch latest menu from DB when component mounts
     useEffect(() => {
         const fetchMenu = async () => {
             try {
-                const response = await axios.get("http://localhost:5000/api/dailymenu");
+                const response = await axios.get(`${API_URL}/daily-menu/get`);
                 if (response.data.menu) {
                     const menu = response.data.menu.map(item => ({
                         name: item.dm_itemName,
@@ -48,11 +48,6 @@ const FoodList = ({ foods, setFoods, handleOpenAdd, handleSubmitMenu, handleOpen
                             >
                                 <div>
                                     <strong>{food.name}</strong>
-                                    {food.saved && (
-                                        <span className="ms-2 text-success" title="Saved in DB">
-                                            <i className="fas fa-check"></i>
-                                        </span>
-                                    )}
                                     <div className="text-muted small">₱{food.price}</div>
                                 </div>
                                 <div>
