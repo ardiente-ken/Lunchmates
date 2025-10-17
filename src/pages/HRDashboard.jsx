@@ -26,22 +26,72 @@ const HRDashboard = () => {
     const [showOrders, setShowOrders] = useState(false);
 
     const [employeeCount, setEmployeeCount] = useState(0);
+    const [orderOpen, setOrderOpen] = useState(false);
+
+    // 🧠 Fetch order status
+    const fetchOrderStatus = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/order/status`);
+            setOrderOpen(res.data?.isOpen || false);
+        } catch (err) {
+            console.error("❌ Failed to fetch order status:", err);
+        }
+    };
+
+    // 🚀 Toggle order status (Start/Stop ordering)
+    const toggleOrderStatus = async () => {
+        try {
+            const newStatus = !orderOpen;
+            await axios.post(`${API_URL}/order/status`, { isOpen: newStatus });
+            setOrderOpen(newStatus);
+
+            Swal.fire({
+                icon: "success",
+                title: newStatus ? "Ordering Started!" : "Ordering Stopped!",
+                text: newStatus
+                    ? "Employees can now place their orders."
+                    : "Ordering has been closed for everyone.",
+                timer: 1500,
+                showConfirmButton: false,
+            });
+        } catch (err) {
+            console.error("❌ Failed to toggle order status:", err);
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: err.response?.data?.message || "Server error",
+            });
+        }
+    };
 
     // 🧩 Fetch employee count only (no need to load all orders here)
     const fetchEmployeeCount = async () => {
         try {
-            const res = await axios.get("http://localhost:5000/api/orders/today/employees");
-            const { employeeCount = 0 } = res.data || {};
+            const res = await axios.get(`${API_URL}/order/get/all`);
+            const employeeCount = Array.isArray(res.data) ? res.data.length : 0;
             setEmployeeCount(employeeCount);
         } catch (error) {
             console.error("❌ Failed to fetch employee count:", error);
         }
     };
 
+
     // Run once when page loads, then refresh every 60s
     useEffect(() => {
         fetchEmployeeCount();
+        fetchOrderStatus(); // 👈 add this
     }, []);
+
+    // 🔁 Auto-refresh order status every 30 seconds
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchOrderStatus();
+        }, 30000); // 30 seconds
+
+        // Cleanup when component unmounts
+        return () => clearInterval(interval);
+    }, []);
+
 
     // --- FETCH DAILY MENU ---
     const fetchDailyMenu = async () => {
@@ -285,7 +335,7 @@ const HRDashboard = () => {
                     <h4 className="mb-4">Overview</h4>
 
                     <div className="row mb-4">
-                        <div className="col-md-6">
+                        <div className="col-md-4">
                             <div className="card shadow-sm border-0 p-3 text-center">
                                 <h6>Orders</h6>
                                 <h3>{employeeCount}</h3>
@@ -297,15 +347,82 @@ const HRDashboard = () => {
                                 </button>
                             </div>
                         </div>
-                        <div className="col-md-6">
+                        <div className="col-md-4">
                             <div className="card shadow-sm border-0 p-3 text-center">
                                 <h6>Cut Off Time</h6>
                                 <h3>{cutOffTime ? convertTo12H(cutOffTime) : "--:--"}</h3>
                                 <button
-                                    className="btn btn-outline-success btn-sm mt-2"
-                                    onClick={() => setShowCutOffModal(true)}
+                                    className={`btn btn-sm mt-2 ${orderOpen ? "btn-warning text-dark" : "btn-outline-success"
+                                        }`}
+                                    onClick={() => {
+                                        if (orderOpen) {
+                                            Swal.fire({
+                                                icon: "warning",
+                                                title: "Ordering Active",
+                                                text: "You cannot change the cut-off time while ordering is open.",
+                                                timer: 2000,
+                                                showConfirmButton: false,
+                                            });
+                                        } else {
+                                            setShowCutOffModal(true);
+                                        }
+                                    }}
+                                    disabled={orderOpen}
+                                    title={orderOpen ? "Cannot change cutoff while ordering is open" : ""}
                                 >
-                                    <i className="fas fa-clock me-1"></i> Set Cut Off Time
+                                    <i className="fas fa-clock me-1"></i>
+                                    {orderOpen ? "Cut-Off Locked" : "Set Cut Off Time"}
+                                </button>
+
+                            </div>
+                        </div>
+                        <div className="col-md-4">
+                            <div className={`card shadow-sm border-0 p-3 text-center ${orderOpen ? "border-success" : "border-danger"}`}>
+                                <h6>Ordering Status</h6>
+                                <h3 className={orderOpen ? "text-success" : "text-danger"}>
+                                    {orderOpen ? "OPEN" : "CLOSED"}
+                                </h3>
+                                <button
+                                    disabled={orderOpen} // disable when already open
+                                    className={`btn btn-sm mt-2 ${orderOpen ? "btn-outline-secondary" : "btn-outline-success"
+                                        }`}
+                                    onClick={async () => {
+                                        if (!orderOpen) {
+                                            const result = await Swal.fire({
+                                                icon: "warning",
+                                                title: "Start Ordering?",
+                                                html: `
+          <p>You are about to <b>open ordering</b>.</p>
+          <p class="mt-2 mb-1 text-danger">
+            This will <b>lock today's cut-off time</b><br />
+            and <b>automatically close ordering</b> when the cut-off is reached.
+          </p>
+          <p class="text-muted small mb-0">
+            ⚠️ You won’t be able to change this once started.
+          </p>
+        `,
+                                                showCancelButton: true,
+                                                confirmButtonText: "Yes, start ordering",
+                                                cancelButtonText: "Cancel",
+                                                confirmButtonColor: "#28a745",
+                                                cancelButtonColor: "#6c757d",
+                                            });
+
+                                            if (!result.isConfirmed) return;
+
+                                            // 🔒 Disable the button immediately
+                                            const btn = document.activeElement;
+                                            btn.disabled = true;
+
+                                            await toggleOrderStatus(); // open ordering
+                                        }
+                                    }}
+                                >
+                                    <i
+                                        className={`fas ${orderOpen ? "fa-lock text-secondary" : "fa-play-circle"
+                                            } me-1`}
+                                    ></i>
+                                    {orderOpen ? `Employees Can Place Orders Until ${convertTo12H(cutOffTime)}` : "Start Ordering"}
                                 </button>
                             </div>
                         </div>
@@ -319,6 +436,7 @@ const HRDashboard = () => {
                                 handleOpenAdd={handleOpenAdd}
                                 handleOpenUpdate={handleOpenUpdate}
                                 handleDelete={handleDelete}
+                                orderOpen={orderOpen} 
                             />
                         </div>
                         <div className="col-md-4 mb-4">

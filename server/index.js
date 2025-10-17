@@ -9,6 +9,7 @@ import userRoute from "./routes/userRoute.js";
 import cutOffRoute from "./routes/cutoffRoute.js";
 import dailyMenuRoute from "./routes/dailyMenuRoute.js"
 import orderRoute from "./routes/orderRoute.js";
+import orderStatusRoute from "./routes/orderStatusRoute.js";
 // App
 const app = express();
 dotenv.config();
@@ -40,3 +41,4 @@ app.use("/api", userRoute);
 app.use("/api", cutOffRoute);
 app.use("/api", dailyMenuRoute);
 app.use("/api", orderRoute);
+app.use("/api", orderStatusRoute);

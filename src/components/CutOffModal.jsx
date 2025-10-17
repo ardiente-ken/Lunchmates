@@ -32,6 +32,19 @@ const CutOffModal = ({ show, onClose, currentTime, onSave }) => {
     const formattedTime = selectedTime.length === 5 ? `${selectedTime}:00` : selectedTime;
     console.log("➡️ Formatted time to send:", formattedTime);
 
+    const now = new Date();
+    const [h, m, s] = formattedTime.split(":").map(Number);
+    const selectedDateTime = new Date();
+    selectedDateTime.setHours(h, m, s || 0, 0);
+
+    if (selectedDateTime <= now) {
+      Swal.fire({
+        icon: "warning",
+        title: "Invalid Time",
+        text: "You cannot set a cutoff time earlier than the current time.",
+      });
+      return;
+    }
     // Get logged-in user from localStorage
     const storedUser = localStorage.getItem("user");
     const loggedInUser = storedUser ? JSON.parse(storedUser) : null;

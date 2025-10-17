@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { API_URL } from "../global";
 
 const OrderSummary = () => {
   const [summary, setSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [orderMessage, setOrderMessage] = useState("");
-
   // Fetch aggregated employee orders on mount
   useEffect(() => {
     const fetchSummary = async () => {
       try {
         const res = await axios.get(
-          "http://localhost:5000/api/orders/summary"
+          `${API_URL}/order/get/all`
         );
         setSummary(res.data.summary || []);
       } catch (err) {

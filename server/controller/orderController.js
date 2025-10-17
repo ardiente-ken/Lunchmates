@@ -129,7 +129,7 @@ export const getAllTodaysOrders = async (req, res) => {
 
         const orders = await Order.find({
             oh_orderDate: { $gte: todayStart, $lte: todayEnd },
-        }).populate("oh_userID", "um_firstname um_lastname um_username");
+        }).populate("oh_userID", "um_firstName um_lastName um_username");
 
         res.status(200).json(orders);
     } catch (err) {
@@ -137,6 +137,7 @@ export const getAllTodaysOrders = async (req, res) => {
         res.status(500).json({ message: "Server error", error: err.message });
     }
 };
+
 
 /**
  * Update an existing order by ID or by userId (for today)
