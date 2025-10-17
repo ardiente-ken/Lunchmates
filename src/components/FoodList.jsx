@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { API_URL } from "../global";
 
@@ -8,19 +8,47 @@ const FoodList = ({
   handleOpenAdd,
   handleOpenUpdate,
   handleDelete,
-  orderOpen, // 👈 add this prop
+  orderOpen, // 👈 from parent
 }) => {
+  const [isPastCutoff, setIsPastCutoff] = useState(false);
 
-  // Always fetch latest menu from DB when component mounts
+  // ✅ Fetch cutoff time from backend
+  useEffect(() => {
+    const checkCutoff = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/cutoff/get`);
+        if (res.data && res.data.cutoff) {
+          const cutoffTime = new Date(
+            `${res.data.cutoff.co_date}T${res.data.cutoff.co_time}`
+          );
+          const now = new Date();
+          setIsPastCutoff(now > cutoffTime);
+        }
+      } catch (err) {
+        console.error("❌ Failed to fetch cutoff:", err);
+      }
+    };
+
+    checkCutoff();
+
+    // recheck every 1 minute
+    const interval = setInterval(checkCutoff, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ✅ Disable menu modification if ordering is open or cutoff has passed
+  const disableMenu = orderOpen || isPastCutoff;
+
+  // ✅ Fetch latest menu when mounted
   useEffect(() => {
     const fetchMenu = async () => {
       try {
         const response = await axios.get(`${API_URL}/daily-menu/get`);
         if (response.data.menu) {
-          const menu = response.data.menu.map(item => ({
+          const menu = response.data.menu.map((item) => ({
             name: item.dm_itemName,
             price: parseFloat(item.dm_itemPrice).toFixed(2),
-            saved: true, // mark as saved
+            saved: true,
           }));
           setFoods(menu);
         }
@@ -39,10 +67,12 @@ const FoodList = ({
         <button
           className="btn btn-success btn-sm me-2"
           onClick={handleOpenAdd}
-          disabled={orderOpen} // 👈 disable when ordering is open
+          disabled={disableMenu}
           title={
-            orderOpen
-              ? "Ordering is open — you can't modify the menu now."
+            disableMenu
+              ? orderOpen
+                ? "Ordering is open — menu changes are locked."
+                : "Cut-off time has passed — menu changes are locked."
               : "Add new food item"
           }
         >
@@ -71,14 +101,14 @@ const FoodList = ({
                   <button
                     className="btn btn-sm btn-outline-secondary me-2"
                     onClick={() => handleOpenUpdate(index)}
-                    disabled={orderOpen} // 👈 disable editing too
+                    disabled={disableMenu}
                   >
                     Edit
                   </button>
                   <button
                     className="btn btn-sm btn-danger"
                     onClick={() => handleDelete(index)}
-                    disabled={orderOpen} // 👈 disable delete as well
+                    disabled={disableMenu}
                   >
                     Delete
                   </button>

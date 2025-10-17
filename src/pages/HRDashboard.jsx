@@ -28,6 +28,9 @@ const HRDashboard = () => {
     const [employeeCount, setEmployeeCount] = useState(0);
     const [orderOpen, setOrderOpen] = useState(false);
 
+    // 🆕 Track whether current time > cutoff
+    const [isPastCutoff, setIsPastCutoff] = useState(false);
+
     // 🧠 Fetch order status
     const fetchOrderStatus = async () => {
         try {
@@ -64,7 +67,7 @@ const HRDashboard = () => {
         }
     };
 
-    // 🧩 Fetch employee count only (no need to load all orders here)
+    // 🧩 Fetch employee count
     const fetchEmployeeCount = async () => {
         try {
             const res = await axios.get(`${API_URL}/order/get/all`);
@@ -75,22 +78,39 @@ const HRDashboard = () => {
         }
     };
 
-
-    // Run once when page loads, then refresh every 60s
+    // --- LIVE SYNC: order status, cutoff, and employee orders ---
     useEffect(() => {
-        fetchEmployeeCount();
-        fetchOrderStatus(); // 👈 add this
-    }, []);
+        const fetchUserOrders = async () => {
+            try {
+                const res = await axios.get(`${API_URL}/order/get/all`);
+                const count = Array.isArray(res.data) ? res.data.length : 0;
+                setEmployeeCount(count);
+            } catch (err) {
+                console.error("❌ Failed to fetch user orders:", err);
+            }
+        };
 
-    // 🔁 Auto-refresh order status every 30 seconds
-    useEffect(() => {
-        const interval = setInterval(() => {
-            fetchOrderStatus();
-        }, 30000); // 30 seconds
+        const checkCutoff = () => {
+            if (!cutOffTime) return setIsPastCutoff(false);
+            const now = new Date();
+            const [hour, minute, second] = cutOffTime.split(":").map(Number);
+            const cutoffDate = new Date();
+            cutoffDate.setHours(hour, minute, second || 0, 0);
+            setIsPastCutoff(now > cutoffDate);
+        };
 
-        // Cleanup when component unmounts
+        const fetchAll = async () => {
+            await fetchOrderStatus();  // update orderOpen
+            await fetchCutOff();       // update cutOffTime
+            await fetchUserOrders();   // update employeeCount
+            checkCutoff();             // update isPastCutoff
+        };
+
+        fetchAll(); // initial call
+
+        const interval = setInterval(fetchAll, 10000); // every 10 seconds
         return () => clearInterval(interval);
-    }, []);
+    }, [cutOffTime]);
 
 
     // --- FETCH DAILY MENU ---
@@ -102,7 +122,7 @@ const HRDashboard = () => {
                     res.data.menu.map((f) => ({
                         name: f.dm_itemName,
                         price: parseFloat(f.dm_itemPrice).toFixed(2),
-                        saved: true, // mark as saved
+                        saved: true,
                     }))
                 );
             }
@@ -111,32 +131,52 @@ const HRDashboard = () => {
         }
     };
 
-    useEffect(() => {
-        fetchDailyMenu();
-    }, []);
-
     // --- FETCH CUT-OFF TIME ---
     const fetchCutOff = async () => {
         try {
             const response = await axios.get(`${API_URL}/cutoff/get`);
-            console.log("📥 Cut-Off API response:", response.data);
-
-            // Ensure cutOff exists and has a valid co_time
-            if (response.data && response.data.cutOff && response.data.cutOff.co_time) {
+            if (response.data?.cutOff?.co_time) {
                 setCutOffTime(response.data.cutOff.co_time);
-                console.log("✅ Cut-off time set:", response.data.cutOff.co_time);
             } else {
-                console.warn("⚠️ Cut-off data missing or invalid:", response.data);
+                // No cutoff set → keep buttons active
+                setCutOffTime("");
+                setIsPastCutoff(false);
             }
         } catch (err) {
-            console.error("❌ Failed to fetch cut-off:", err);
+            // If 404 (no cutoff yet) → treat as “no cutoff set”
+            if (err.response?.status === 404) {
+                console.warn("No cutoff set for today, buttons remain active.");
+                setCutOffTime("");
+                setIsPastCutoff(false);
+            } else {
+                console.error("❌ Failed to fetch cut-off:", err);
+                setCutOffTime("");
+                setIsPastCutoff(false);
+            }
         }
     };
 
 
     useEffect(() => {
-        fetchCutOff();
-    }, []);
+        if (!cutOffTime) {
+            setIsPastCutoff(false); // no cutoff → don't lock
+            return;
+        }
+
+        const checkCutoff = () => {
+            const now = new Date();
+            const [hour, minute, second] = cutOffTime.split(":").map(Number);
+            const cutoffDate = new Date();
+            cutoffDate.setHours(hour, minute, second || 0, 0);
+
+            setIsPastCutoff(now > cutoffDate);
+        };
+
+        checkCutoff(); // initial check
+        const interval = setInterval(checkCutoff, 10000); // check every minute
+        return () => clearInterval(interval);
+    }, [cutOffTime]);
+
 
     // --- ESCAPE KEY CLOSE ---
     useEffect(() => {
@@ -164,7 +204,7 @@ const HRDashboard = () => {
                 showConfirmButton: false,
             });
             resetModal();
-            fetchDailyMenu(); // REFRESH FROM DB
+            fetchDailyMenu();
         } catch (err) {
             console.error("❌ Add food error:", err);
             Swal.fire({
@@ -182,14 +222,11 @@ const HRDashboard = () => {
         if (isNaN(p)) return;
 
         const oldFood = foods[updateIndex];
-
         try {
-            // Today's date in YYYY-MM-DD
             const today = new Date().toISOString().split("T")[0];
-
-            const response = await axios.put(`${API_URL}/daily-menu/update`, {
-                itemName: oldFood.name,   // current name in DB
-                date: today,              // always today
+            await axios.put(`${API_URL}/daily-menu/update`, {
+                itemName: oldFood.name,
+                date: today,
                 newItemName: foodName.trim(),
                 newItemPrice: price,
             });
@@ -201,7 +238,7 @@ const HRDashboard = () => {
                 showConfirmButton: false,
             });
             resetModal();
-            fetchDailyMenu(); // REFRESH FROM DB
+            fetchDailyMenu();
         } catch (err) {
             console.error("❌ Update food error:", err);
             Swal.fire({
@@ -225,14 +262,9 @@ const HRDashboard = () => {
         }).then(async (result) => {
             if (result.isConfirmed) {
                 try {
-                    // Today's date in YYYY-MM-DD
                     const today = new Date().toISOString().split("T")[0];
-
                     await axios.delete(`${API_URL}/daily-menu/delete`, {
-                        data: {
-                            itemName: food.name, // item to delete
-                            date: today          // always today
-                        },
+                        data: { itemName: food.name, date: today },
                     });
                     Swal.fire({
                         icon: "success",
@@ -241,7 +273,7 @@ const HRDashboard = () => {
                         timer: 1500,
                         showConfirmButton: false,
                     });
-                    fetchDailyMenu(); // REFRESH FROM DB
+                    fetchDailyMenu();
                 } catch (err) {
                     console.error("❌ Delete food error:", err);
                     Swal.fire({
@@ -281,7 +313,6 @@ const HRDashboard = () => {
             const today = new Date().toISOString().split("T")[0];
             const formattedTime = time.length === 5 ? `${time}:00` : time;
 
-            // Parse the stored user from localStorage
             const storedUser = localStorage.getItem("user");
             const loggedInUser = storedUser ? JSON.parse(storedUser) : null;
             const updatedBy = loggedInUser
@@ -291,7 +322,7 @@ const HRDashboard = () => {
             const response = await axios.post(`${API_URL}/cutoff/set`, {
                 date: today,
                 time: formattedTime,
-                updatedBy, // <-- include the user who updated
+                updatedBy,
             });
 
             setCutOffTime(formattedTime);
@@ -315,14 +346,13 @@ const HRDashboard = () => {
         }
     };
 
-
     function convertTo12H(timeStr) {
         if (!timeStr) return "--:--";
         const [hourStr, minute] = timeStr.split(":");
         let hour = parseInt(hourStr, 10);
-        if (isNaN(hour) || !minute) return "--:--"; // safeguard
+        if (isNaN(hour) || !minute) return "--:--";
         const ampm = hour >= 12 ? "PM" : "AM";
-        hour = hour % 12 || 12; // 0 → 12
+        hour = hour % 12 || 12;
         return `${hour}:${minute} ${ampm}`;
     }
 
@@ -330,11 +360,12 @@ const HRDashboard = () => {
         <div className="d-flex" style={{ minHeight: "100vh" }}>
             <div className="flex-grow-1 bg-light">
                 <TopNavbar />
-
                 <div className="container-fluid p-4">
                     <h4 className="mb-4">Overview</h4>
 
+                    {/* Cards Row */}
                     <div className="row mb-4">
+                        {/* Orders */}
                         <div className="col-md-4">
                             <div className="card shadow-sm border-0 p-3 text-center">
                                 <h6>Orders</h6>
@@ -347,12 +378,16 @@ const HRDashboard = () => {
                                 </button>
                             </div>
                         </div>
+
+                        {/* Cutoff */}
                         <div className="col-md-4">
                             <div className="card shadow-sm border-0 p-3 text-center">
                                 <h6>Cut Off Time</h6>
                                 <h3>{cutOffTime ? convertTo12H(cutOffTime) : "--:--"}</h3>
                                 <button
-                                    className={`btn btn-sm mt-2 ${orderOpen ? "btn-warning text-dark" : "btn-outline-success"
+                                    className={`btn btn-sm mt-2 ${orderOpen
+                                        ? "btn-warning text-dark"
+                                        : "btn-outline-success"
                                         }`}
                                     onClick={() => {
                                         if (orderOpen) {
@@ -368,23 +403,35 @@ const HRDashboard = () => {
                                         }
                                     }}
                                     disabled={orderOpen}
-                                    title={orderOpen ? "Cannot change cutoff while ordering is open" : ""}
+                                    title={
+                                        orderOpen ? "Cannot change cutoff while ordering is open" : ""
+                                    }
                                 >
                                     <i className="fas fa-clock me-1"></i>
                                     {orderOpen ? "Cut-Off Locked" : "Set Cut Off Time"}
                                 </button>
-
                             </div>
                         </div>
+
+                        {/* Ordering Status */}
                         <div className="col-md-4">
-                            <div className={`card shadow-sm border-0 p-3 text-center ${orderOpen ? "border-success" : "border-danger"}`}>
+                            <div
+                                className={`card shadow-sm border-0 p-3 text-center ${orderOpen ? "border-success" : "border-danger"
+                                    }`}
+                            >
                                 <h6>Ordering Status</h6>
-                                <h3 className={orderOpen ? "text-success" : "text-danger"}>
+                                <h3
+                                    className={`${orderOpen ? "text-success" : "text-danger"} fw-bold`}
+                                    style={{ fontWeight: 900 }}
+                                >
                                     {orderOpen ? "OPEN" : "CLOSED"}
                                 </h3>
+
                                 <button
-                                    disabled={orderOpen} // disable when already open
-                                    className={`btn btn-sm mt-2 ${orderOpen ? "btn-outline-secondary" : "btn-outline-success"
+                                    disabled={orderOpen}
+                                    className={`btn btn-sm mt-2 ${orderOpen
+                                        ? "btn-outline-secondary"
+                                        : "btn-outline-success"
                                         }`}
                                     onClick={async () => {
                                         if (!orderOpen) {
@@ -392,15 +439,15 @@ const HRDashboard = () => {
                                                 icon: "warning",
                                                 title: "Start Ordering?",
                                                 html: `
-          <p>You are about to <b>open ordering</b>.</p>
-          <p class="mt-2 mb-1 text-danger">
-            This will <b>lock today's cut-off time</b><br />
-            and <b>automatically close ordering</b> when the cut-off is reached.
-          </p>
-          <p class="text-muted small mb-0">
-            ⚠️ You won’t be able to change this once started.
-          </p>
-        `,
+              <p>You are about to <b>open ordering</b>.</p>
+              <p class="mt-2 mb-1 text-danger">
+                This will <b>lock today's cut-off time</b><br />
+                and <b>automatically close ordering</b> when the cut-off is reached.
+              </p>
+              <p class="text-muted small mb-0">
+                ⚠️ You won’t be able to change this once started.
+              </p>
+            `,
                                                 showCancelButton: true,
                                                 confirmButtonText: "Yes, start ordering",
                                                 cancelButtonText: "Cancel",
@@ -409,12 +456,9 @@ const HRDashboard = () => {
                                             });
 
                                             if (!result.isConfirmed) return;
-
-                                            // 🔒 Disable the button immediately
                                             const btn = document.activeElement;
                                             btn.disabled = true;
-
-                                            await toggleOrderStatus(); // open ordering
+                                            await toggleOrderStatus();
                                         }
                                     }}
                                 >
@@ -422,12 +466,15 @@ const HRDashboard = () => {
                                         className={`fas ${orderOpen ? "fa-lock text-secondary" : "fa-play-circle"
                                             } me-1`}
                                     ></i>
-                                    {orderOpen ? `Employees Can Place Orders Until ${convertTo12H(cutOffTime)}` : "Start Ordering"}
+                                    {orderOpen
+                                        ? `Employees Can Place Orders Until ${convertTo12H(cutOffTime)}`
+                                        : "Start Ordering"}
                                 </button>
                             </div>
                         </div>
                     </div>
 
+                    {/* Food + Summary */}
                     <div className="row">
                         <div className="col-md-8 mb-4">
                             <FoodList
@@ -436,7 +483,7 @@ const HRDashboard = () => {
                                 handleOpenAdd={handleOpenAdd}
                                 handleOpenUpdate={handleOpenUpdate}
                                 handleDelete={handleDelete}
-                                orderOpen={orderOpen} 
+                                orderOpen={orderOpen || isPastCutoff} // 🆕 lock menu if cutoff passed
                             />
                         </div>
                         <div className="col-md-4 mb-4">
@@ -446,6 +493,7 @@ const HRDashboard = () => {
                 </div>
             </div>
 
+            {/* Modals */}
             <FoodModal
                 show={showModal}
                 onClose={() => setShowModal(false)}
@@ -455,6 +503,8 @@ const HRDashboard = () => {
                 price={price}
                 setPrice={setPrice}
                 mode={modalMode}
+                orderOpen={orderOpen}
+                isPastCutoff={isPastCutoff}
             />
 
             <CutOffModal
