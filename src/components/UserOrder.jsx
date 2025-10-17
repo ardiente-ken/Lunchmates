@@ -1,28 +1,51 @@
 import React, { useState, useEffect } from "react";
 import Swal from "sweetalert2";
 import axios from "axios";
+import { API_URL } from "../global";
 
-const UserOrder = ({ userId, localOrders = [], setLocalOrders, onOrderCancelled, disabled }) => {
-  const [dbOrders, setDbOrders] = useState([]);
+const UserOrder = ({
+  userId,
+  localOrders = [],
+  setLocalOrders,
+  onOrderCancelled,
+  disabled,
+  cutoff,
+}) => {
+  const [dbOrder, setDbOrder] = useState(null);
   const [submitted, setSubmitted] = useState(false);
 
-  const displayOrders = dbOrders.length > 0 ? dbOrders : localOrders;
+  // Check if cutoff is passed
+  const isPastCutoff = (() => {
+    if (!cutoff) return false;
+    const [hours, minutes] = cutoff.split(":").map(Number);
+    const cutOffDate = new Date();
+    cutOffDate.setHours(hours, minutes, 0, 0);
+    return new Date() >= cutOffDate;
+  })();
 
-  const totalAmount = displayOrders.reduce(
-    (sum, item) => sum + (item.price || 0) * (item.qty || 0),
-    0
-  );
+  // Orders to display
+  const displayOrders =
+    localOrders && localOrders.length > 0
+      ? localOrders
+      : dbOrder?.items || [];
 
+  // Compute total
+  const totalAmount =
+    dbOrder?.oh_totalAmount ??
+    displayOrders.reduce((sum, item) => sum + (item.price || 0) * (item.qty || 0), 0);
+
+  // Fetch today's order
   const fetchTodaysOrder = async () => {
     if (!userId) return;
     try {
-      const res = await axios.get("http://localhost:5000/api/orders/today", {
-        params: { userId },
-      });
-      setDbOrders(res.data || []);
-      setSubmitted((res.data || []).length > 0);
+      const res = await axios.get(`${API_URL}/order/get`, { params: { userId } });
+      const orderData = res.data;
+      setDbOrder(orderData || null);
+      const isSubmitted =
+        !!orderData && Array.isArray(orderData.items) && orderData.items.length > 0;
+      setSubmitted(isSubmitted);
     } catch (err) {
-      console.error("❌ Failed to fetch today's order:", err);
+      console.error("Failed to fetch today's order:", err);
     }
   };
 
@@ -30,11 +53,11 @@ const UserOrder = ({ userId, localOrders = [], setLocalOrders, onOrderCancelled,
     fetchTodaysOrder();
   }, [userId]);
 
+  // Submit or update order
   const handleSubmitMenu = async () => {
-    if (!localOrders || localOrders.length === 0) {
-      if (submitted) {
-        handleCancelOrder(); // auto cancel if no items
-      } else {
+    if (!displayOrders || displayOrders.length === 0) {
+      if (submitted) handleCancelOrder();
+      else
         Swal.fire({
           icon: "info",
           title: "No Items",
@@ -42,7 +65,6 @@ const UserOrder = ({ userId, localOrders = [], setLocalOrders, onOrderCancelled,
           timer: 1500,
           showConfirmButton: false,
         });
-      }
       return;
     }
 
@@ -57,42 +79,47 @@ const UserOrder = ({ userId, localOrders = [], setLocalOrders, onOrderCancelled,
       confirmButtonColor: "#28a745",
       confirmButtonText: submitted ? "Yes, update it!" : "Yes, submit it!",
     }).then(async (result) => {
-      if (result.isConfirmed) {
-        try {
-          await axios.post("http://localhost:5000/api/orders", {
-            userId,
-            totalAmount,
-            orderItems: localOrders.map((item) => ({
-              name: item.name,
-              price: item.price,
-              qty: item.qty,
-            })),
-          });
+      if (!result.isConfirmed) return;
+      try {
+        const payload = {
+          userId,
+          items: displayOrders.map((item) => ({
+            name: item.name,
+            price: item.price,
+            qty: item.qty,
+          })),
+        };
 
-          Swal.fire({
-            icon: "success",
-            title: submitted ? "Order Updated!" : "Order Submitted!",
-            text: submitted
-              ? "Your order has been updated successfully."
-              : "Your order has been submitted successfully.",
-            timer: 1500,
-            showConfirmButton: false,
-          });
+        const endpoint = submitted
+          ? `${API_URL}/order/update`
+          : `${API_URL}/order/submit`;
+        const method = submitted ? "put" : "post";
 
-          await fetchTodaysOrder();
-          if (typeof setLocalOrders === "function") setLocalOrders([]);
-        } catch (error) {
-          console.error("❌ Error submitting order:", error);
-          Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: "There was an issue submitting your order. Please try again.",
-          });
-        }
+        const res = await axios({ method, url: endpoint, data: payload });
+
+        Swal.fire({
+          icon: "success",
+          title: submitted ? "Order Updated!" : "Order Submitted!",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+
+        await fetchTodaysOrder();
+        if (setLocalOrders) setLocalOrders(res?.data?.order?.items || []);
+      } catch (error) {
+        console.error("Error submitting order:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text:
+            error.response?.data?.message ||
+            "There was an issue submitting your order. Please try again.",
+        });
       }
     });
   };
 
+  // Cancel order
   const handleCancelOrder = async () => {
     Swal.fire({
       title: "Cancel your order?",
@@ -103,42 +130,32 @@ const UserOrder = ({ userId, localOrders = [], setLocalOrders, onOrderCancelled,
       cancelButtonColor: "#6c757d",
       confirmButtonText: "Yes, cancel it!",
     }).then(async (result) => {
-      if (result.isConfirmed) {
-        try {
-          await axios.delete("http://localhost:5000/api/orders", {
-            params: { userId },
-          });
+      if (!result.isConfirmed) return;
+      try {
+        await axios.delete(`${API_URL}/order/cancel`, { params: { userId } });
+        Swal.fire({
+          icon: "success",
+          title: "Order Cancelled",
+          timer: 1500,
+          showConfirmButton: false,
+        });
 
-          Swal.fire({
-            icon: "success",
-            title: "Order Cancelled",
-            text: "Your order has been cancelled successfully.",
-            timer: 1500,
-            showConfirmButton: false,
-          });
-
-          // Reset local + db states
-          setDbOrders([]);
-          setSubmitted(false);
-          if (typeof setLocalOrders === "function") setLocalOrders([]);
-
-          // 🧩 Notify parent to reset MenuUser quantities
-          if (typeof onOrderCancelled === "function") {
-            onOrderCancelled();
-          }
-
-          await fetchTodaysOrder();
-        } catch (error) {
-          console.error("❌ Error cancelling order:", error);
-          Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: "There was an issue cancelling your order. Please try again.",
-          });
-        }
+        setDbOrder(null);
+        setSubmitted(false);
+        if (setLocalOrders) setLocalOrders([]);
+        if (onOrderCancelled) onOrderCancelled();
+      } catch (error) {
+        console.error("Error cancelling order:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "There was an issue cancelling your order. Please try again.",
+        });
       }
     });
   };
+
+  const showOrderSubmitted = submitted && isPastCutoff;
 
   return (
     <div className="card shadow-sm border-0 p-4 d-flex flex-column h-100" style={{ maxHeight: "80vh" }}>
@@ -180,24 +197,38 @@ const UserOrder = ({ userId, localOrders = [], setLocalOrders, onOrderCancelled,
       <hr />
       <h6 className="text-end">Total: ₱{totalAmount.toFixed(2)}</h6>
 
-      <div className="d-flex gap-2 mt-2">
-        <button
-          className={`btn flex-grow-1 ${submitted ? "btn-warning" : "btn-success"} btn-md`}
-          onClick={handleSubmitMenu}
-          disabled={disabled} // ✅ disables the button if disabled prop is true
-        >
-          <i className={`fas ${submitted ? "fa-edit" : "fa-check"} me-1`}></i>
-          {submitted ? "Update Order" : "Submit Order"}
-        </button>
+      <div className="d-flex flex-column gap-2 mt-2">
+        <div className="d-flex gap-2 mt-2">
+          {showOrderSubmitted ? (
+            <button className="btn btn-secondary flex-grow-1 btn-md" disabled>
+              <i className="fas fa-check me-1"></i> Order Submitted
+            </button>
+          ) : (
+            <button
+              className={`btn flex-grow-1 ${submitted ? "btn-warning" : "btn-success"} btn-md`}
+              onClick={handleSubmitMenu}
+              disabled={disabled}
+            >
+              <i className={`fas ${submitted ? "fa-edit" : "fa-check"} me-1`}></i>
+              {submitted ? "Update Order" : "Submit Order"}
+            </button>
+          )}
 
-        {submitted && (
-          <button
-            className="btn btn-danger btn-md"
-            onClick={handleCancelOrder}
-            disabled={disabled} // ✅ disables the cancel button too
-          >
-            <i className="fas fa-times me-1"></i> Cancel
-          </button>
+          {submitted && !showOrderSubmitted && (
+            <button
+              className="btn btn-danger btn-md"
+              onClick={handleCancelOrder}
+              disabled={disabled}
+            >
+              <i className="fas fa-times me-1"></i> Cancel
+            </button>
+          )}
+        </div>
+
+        {!showOrderSubmitted && submitted && cutoff && (
+          <small className="text-muted mt-1">
+            ✅ Order submitted! You have until <b>{cutoff}</b> to edit your order.
+          </small>
         )}
       </div>
     </div>

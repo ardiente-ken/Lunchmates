@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
+import { API_URL } from "../global";
 
 const CutOffModal = ({ show, onClose, currentTime, onSave }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -27,25 +28,39 @@ const CutOffModal = ({ show, onClose, currentTime, onSave }) => {
     const today = new Date().toISOString().split("T")[0];
     console.log("➡️ Today's date:", today);
 
-    // Format time for SQL (HH:MM:SS)
+    // Format time for backend (HH:MM:SS)
     const formattedTime = selectedTime.length === 5 ? `${selectedTime}:00` : selectedTime;
     console.log("➡️ Formatted time to send:", formattedTime);
 
+    const now = new Date();
+    const [h, m, s] = formattedTime.split(":").map(Number);
+    const selectedDateTime = new Date();
+    selectedDateTime.setHours(h, m, s || 0, 0);
+
+    if (selectedDateTime <= now) {
+      Swal.fire({
+        icon: "warning",
+        title: "Invalid Time",
+        text: "You cannot set a cutoff time earlier than the current time.",
+      });
+      return;
+    }
+    // Get logged-in user from localStorage
+    const storedUser = localStorage.getItem("user");
+    const loggedInUser = storedUser ? JSON.parse(storedUser) : null;
+    const updatedBy = loggedInUser
+      ? `${loggedInUser.um_firstName} ${loggedInUser.um_lastName}`
+      : "Unknown";
+    console.log("➡️ Updating cut-off as user:", updatedBy);
+
     try {
-      const response = await axios.post("http://localhost:5000/api/cutoff", {
+      const response = await axios.post(`${API_URL}/cutoff/set`, {
         date: today,
         time: formattedTime,
+        updatedBy, // <-- include user who updated
       });
 
       console.log("✅ API Response:", response.data);
-
-      Swal.fire({
-        icon: "success",
-        title: "Cut-Off Time Set!",
-        text: response.data.message,
-        timer: 1500,
-        showConfirmButton: false,
-      });
 
       // Update parent state
       onSave(formattedTime);
@@ -54,12 +69,6 @@ const CutOffModal = ({ show, onClose, currentTime, onSave }) => {
       onClose();
     } catch (err) {
       console.error("❌ Cut-off error:", err);
-
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: err.response?.data?.message || "Server error",
-      });
     }
   };
 

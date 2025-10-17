@@ -1,100 +1,103 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import Swal from "sweetalert2";
 import axios from "axios";
 
 import TopNavbar from "../components/TopNavbar";
 import Orders from "../components/Orders";
 import UserOrder from "../components/UserOrder";
 import MenuUser from "../components/MenuUser";
+import { API_URL } from "../global";
 
 const UserDashboard = () => {
-  const storedUser = JSON.parse(localStorage.getItem("user"));
-  const userId = storedUser?.userId || storedUser?.id || storedUser?.um_id;
+  const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+  const userId =
+    storedUser?._id ||
+    storedUser?.um_id ||
+    storedUser?.userId ||
+    storedUser?.id ||
+    null;
 
   const [cutOffTime, setCutOffTime] = useState("");
-  const [showOrders, setShowOrders] = useState(false);
-  const [draftOrders, setDraftOrders] = useState([]); // only what user adds manually
-  const [fetchedOrders, setFetchedOrders] = useState([]); // from DB
+  const [draftOrders, setDraftOrders] = useState([]);
+  const [fetchedOrderItems, setFetchedOrderItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [resetTrigger, setResetTrigger] = useState(false);
   const [isCutOffPassed, setIsCutOffPassed] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
 
-  useEffect(() => {
-    if (!cutOffTime) return;
+  // derived disabled flag
+  const isOrderingDisabled = !orderOpen || isCutOffPassed;
 
-    const checkCutOff = () => {
-      const now = new Date();
-      const cutOff = new Date(cutOffTime);
-
-      // Extract hours and minutes
-      const nowMinutes = now.getHours() * 60 + now.getMinutes();
-      const cutOffMinutes = cutOff.getUTCHours() * 60 + cutOff.getUTCMinutes(); // use getUTCHours if your cutoff is UTC
-
-      setIsCutOffPassed(nowMinutes >= cutOffMinutes);
-    };
-
-    checkCutOff();
-    const interval = setInterval(checkCutOff, 30 * 1000); // check every minute
-    return () => clearInterval(interval);
-  }, [cutOffTime]);
-
-
-
-  // 🕓 Fetch today's cut-off time
-  const fetchCutOff = async () => {
-    try {
-      const res = await axios.get("http://localhost:5000/api/cutoff");
-      setCutOffTime(res.data?.cutOff?.co_time || "");
-    } catch (err) {
-      console.error("❌ Failed to fetch cut-off:", err);
-    }
-  };
-
-  // 📦 Fetch user's existing orders from DB
-  const fetchUserOrders = async () => {
+  const fetchUserOrder = async () => {
+    if (!userId) return setFetchedOrderItems([]);
     try {
       setLoading(true);
-      const res = await axios.get(`http://localhost:5000/api/orders/${userId}`);
-      setFetchedOrders(res.data.orders || []);
+      const res = await axios.get(`${API_URL}/order/get`, { params: { userId } });
+      const order = res.data?.order || (res.data && res.data._id ? res.data : null);
+      setFetchedOrderItems(order?.items || []);
     } catch (err) {
-      console.error("❌ Failed to fetch orders:", err);
+      console.warn("Error fetching user order:", err);
+      setFetchedOrderItems([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchCutOff();
-    fetchUserOrders();
-  }, [userId]);
-
-  // 🧭 Escape key closes modal (optional)
-  useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && setShowOrders(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  // ⏰ Convert ISO to 12H
-  const convertTo12H = (iso) => {
-    if (!iso) return "--:--";
-    const t = iso.substring(11, 16);
-    const [h, m] = t.split(":");
-    const hour = parseInt(h, 10);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const twelveH = hour % 12 || 12;
-    return `${twelveH}:${m} ${ampm}`;
+  const fetchCutOff = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/cutoff/get`);
+      setCutOffTime(res.data?.cutOff?.co_time || "");
+    } catch (err) {
+      setCutOffTime("");
+    }
   };
 
-  // 🧮 Combine only for display — without merging duplicates
-  const combinedOrders = [
-    ...fetchedOrders.filter(
-      (db) => !draftOrders.some((local) => local.food_id === db.food_id)
-    ),
-    ...draftOrders,
-  ];
+  const fetchOrderStatus = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/order/status`);
+      setOrderOpen(res.data?.isOpen || false);
+    } catch (err) {
+      setOrderOpen(false);
+    }
+  };
+
+  const checkCutOff = () => {
+    if (!cutOffTime) return setIsCutOffPassed(false);
+    const [hours, minutes] = cutOffTime.split(":").map(Number);
+    if (isNaN(hours) || isNaN(minutes)) return;
+    const cutOffDate = new Date();
+    cutOffDate.setHours(hours, minutes, 0, 0);
+    setIsCutOffPassed(new Date() >= cutOffDate);
+  };
+
+  useEffect(() => {
+    fetchCutOff();
+    fetchOrderStatus();
+    fetchUserOrder();
+  }, [userId, resetTrigger]);
+
+  useEffect(() => {
+    const cutoffInterval = setInterval(() => {
+      fetchCutOff();
+      checkCutOff();
+    }, 10000);
+    const statusInterval = setInterval(fetchOrderStatus, 10000);
+    return () => {
+      clearInterval(cutoffInterval);
+      clearInterval(statusInterval);
+    };
+  }, [cutOffTime]);
+
+  const convertTo12H = (timeStr) => {
+    if (!timeStr) return "--:--";
+    const [hourStr, minute] = timeStr.split(":");
+    let hour = parseInt(hourStr, 10);
+    if (isNaN(hour) || !minute) return "--:--";
+    const ampm = hour >= 12 ? "PM" : "AM";
+    hour = hour % 12 || 12;
+    return `${hour}:${minute} ${ampm}`;
+  };
 
   return (
     <div className="d-flex" style={{ maxHeight: "100vh", overflowY: "hidden" }}>
@@ -102,32 +105,28 @@ const UserDashboard = () => {
         <TopNavbar />
         <div className="container-fluid p-4">
           <h4 className="mb-4">Food Order Imnida</h4>
-
           <div className="row" style={{ height: "calc(100vh - 80px)" }}>
             <div className="col-md-8 d-flex flex-column">
-              {/* Cut Off Time */}
               <div className="mb-4">
                 <div className="card shadow-sm border-0 p-3 text-center">
-                  <h6>
-                    <i className="fas fa-clock me-2"></i> Cut Off Time
-                  </h6>
+                  <h6><i className="fas fa-clock me-2" /> Cut Off Time</h6>
                   <h3>{convertTo12H(cutOffTime)}</h3>
                 </div>
               </div>
 
-              {/* Menu */}
               <div className="flex-grow-1 overflow-auto">
-                <MenuUser
-                  userId={userId}
-                  onOrderDraftChange={setDraftOrders}
-                  existingOrders={fetchedOrders}
-                  resetTrigger={resetTrigger}
-                  disabled={isCutOffPassed} // 🔒 pass here
-                />
+                {!loading && (
+                  <MenuUser
+                    userId={userId}
+                    existingOrders={fetchedOrderItems}
+                    resetTrigger={resetTrigger}
+                    disabled={isOrderingDisabled}
+                    onOrderDraftChange={(orders) => setDraftOrders(orders)}
+                  />
+                )}
               </div>
             </div>
 
-            {/* Right Column */}
             <div className="col-md-4 d-flex flex-column">
               <div className="flex-grow-1">
                 {loading ? (
@@ -138,9 +137,11 @@ const UserDashboard = () => {
                 ) : (
                   <UserOrder
                     userId={userId}
-                    localOrders={combinedOrders}
+                    localOrders={draftOrders}
+                    setLocalOrders={setDraftOrders}
                     onOrderCancelled={() => setResetTrigger(prev => !prev)}
-                    disabled={isCutOffPassed} // 🔒 pass here
+                    disabled={isOrderingDisabled}
+                    cutoff={cutOffTime}
                   />
                 )}
               </div>
@@ -149,7 +150,7 @@ const UserDashboard = () => {
         </div>
       </div>
 
-      <Orders show={showOrders} orders={combinedOrders} disabled={isCutOffPassed} />
+      <Orders show={false} orders={draftOrders} disabled={isOrderingDisabled} />
     </div>
   );
 };

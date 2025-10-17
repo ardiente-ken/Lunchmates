@@ -1,107 +1,136 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { API_URL } from "../global";
 
-const MenuUser = ({ userId, onOrderDraftChange, resetTrigger, disabled }) => {
+const MenuUser = ({
+  userId,
+  existingOrders = [],
+  resetTrigger,
+  disabled: propDisabled,
+  onOrderDraftChange,
+  orderStatus, // 👈 add from parent (e.g., "open" | "closed")
+  cutoffTime,  // 👈 add from parent (e.g., "15:00")
+}) => {
   const [foods, setFoods] = useState([]);
   const [draftOrders, setDraftOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isCutoffPassed, setIsCutoffPassed] = useState(false);
 
-  // 🧾 Fetch menu + user's existing order quantities
+  // 🕒 Check if time now > cutoffTime
   useEffect(() => {
-    const fetchData = async () => {
+    if (!cutoffTime) return;
+
+    const checkCutoff = () => {
+      const now = new Date();
+      const [h, m] = cutoffTime.split(":").map(Number);
+      const cutoff = new Date();
+      cutoff.setHours(h, m, 0, 0);
+      setIsCutoffPassed(now > cutoff);
+    };
+
+    checkCutoff();
+    const timer = setInterval(checkCutoff, 60 * 1000); // check every minute
+    return () => clearInterval(timer);
+  }, [cutoffTime]);
+
+  // Load menu
+  useEffect(() => {
+    const load = async () => {
       try {
         setLoading(true);
-
-        const [menuRes, orderRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/dailymenu"),
-          axios.get(`http://localhost:5000/api/orders/today?userId=${userId}`)
-        ]);
-
-        const menu = menuRes.data.menu.map((item) => ({
-          name: item.dm_itemName,
-          price: item.dm_itemPrice,
+        const res = await axios.get(`${API_URL}/daily-menu/get`);
+        const menu = (res.data.menu || []).map((m) => ({
+          name: String(m.dm_itemName || "").trim(),
+          price: Number(m.dm_itemPrice || 0),
+          qty: 0,
         }));
 
-        const userOrders = orderRes.data || [];
-
-        // merge menu + user's quantities
-        const merged = menu.map((item) => {
-          const match = userOrders.find((o) => o.name === item.name);
-          return { ...item, qty: match ? match.qty : 0 };
+        const userItems = Array.isArray(existingOrders) ? existingOrders : [];
+        const merged = menu.map((f) => {
+          const match = userItems.find(
+            (u) => String(u.name).trim().toLowerCase() === String(f.name).trim().toLowerCase()
+          );
+          return {
+            ...f,
+            qty: match ? Number(match.qty || 0) : 0,
+            price: match ? Number(match.price ?? f.price) : f.price,
+          };
         });
 
         setFoods(merged);
-        setDraftOrders(userOrders.length ? userOrders : []);
+        setDraftOrders(merged.filter((g) => g.qty > 0));
       } catch (err) {
-        console.error("❌ Error fetching menu/user orders:", err);
+        console.error("MenuUser: error loading menu:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    if (userId) fetchData();
-  }, [userId, resetTrigger]); // 👈 Added resetTrigger here
+    load();
+  }, [userId, existingOrders, resetTrigger]);
 
-  // 🔁 Sync draft orders with parent
+  // Push drafts up to parent
   useEffect(() => {
-    if (onOrderDraftChange) {
-      onOrderDraftChange(draftOrders);
+    if (typeof onOrderDraftChange === "function") {
+      const total = draftOrders.reduce((s, i) => s + (i.price || 0) * (i.qty || 0), 0);
+      onOrderDraftChange(draftOrders, total);
     }
   }, [draftOrders, onOrderDraftChange]);
 
-  // helpers
-  const getQty = (food) => {
-    const item = draftOrders.find((o) => o.name === food.name);
-    return item ? item.qty : 0;
-  };
+  const getQty = (foodName) => foods.find((x) => x.name === foodName)?.qty || 0;
 
-  const increment = (food) => {
+  const handleIncrement = (food) => {
+    if (isDisabled) return;
+    setFoods((prev) =>
+      prev.map((f) => (f.name === food.name ? { ...f, qty: f.qty + 1 } : f))
+    );
     setDraftOrders((prev) => {
-      const existing = prev.find((o) => o.name === food.name);
-      if (existing) {
-        return prev.map((o) =>
-          o.name === food.name ? { ...o, qty: o.qty + 1 } : o
-        );
-      }
-      return [...prev, { ...food, qty: 1 }];
+      const item = prev.find((p) => p.name === food.name);
+      return item
+        ? prev.map((p) => (p.name === food.name ? { ...p, qty: p.qty + 1 } : p))
+        : [...prev, { ...food, qty: 1 }];
     });
   };
 
-  const decrement = (food) => {
+  const handleDecrement = (food) => {
+    if (isDisabled) return;
+    setFoods((prev) =>
+      prev.map((f) =>
+        f.name === food.name ? { ...f, qty: Math.max(f.qty - 1, 0) } : f
+      )
+    );
     setDraftOrders((prev) => {
-      const existing = prev.find((o) => o.name === food.name);
-      if (!existing) return prev;
-      if (existing.qty > 1) {
-        return prev.map((o) =>
-          o.name === food.name ? { ...o, qty: o.qty - 1 } : o
-        );
-      }
-      return prev.filter((o) => o.name !== food.name);
+      const item = prev.find((p) => p.name === food.name);
+      if (!item) return prev;
+      if (item.qty <= 1) return prev.filter((p) => p.name !== food.name);
+      return prev.map((p) => (p.name === food.name ? { ...p, qty: p.qty - 1 } : p));
     });
   };
 
-  const removeFromOrder = (food) => {
-    setDraftOrders((prev) => prev.filter((o) => o.name !== food.name));
+  const handleRemove = (food) => {
+    if (isDisabled) return;
+    setFoods((prev) => prev.map((f) => (f.name === food.name ? { ...f, qty: 0 } : f)));
+    setDraftOrders((prev) => prev.filter((p) => p.name !== food.name));
   };
 
-  if (loading) {
+  // 🔒 determine if buttons should be disabled
+  const isDisabled = propDisabled || orderStatus === "closed" || isCutoffPassed;
+
+  if (loading)
     return (
       <div className="card shadow-sm border-0 p-4 text-center">
         <p className="text-muted">Loading menu...</p>
       </div>
     );
-  }
 
-  if (!foods.length) {
+  if (!foods.length)
     return (
       <div className="card shadow-sm border-0 p-4 text-center">
         <p className="text-muted">No food available.</p>
       </div>
     );
-  }
 
-  const listStyle =
-    foods.length >= 5 ? { maxHeight: "50vh", overflowY: "auto" } : {};
+  const listStyle = foods.length >= 5 ? { maxHeight: "50vh", overflowY: "auto" } : {};
 
   return (
     <div className="card shadow-sm border-0 p-4">
@@ -110,11 +139,8 @@ const MenuUser = ({ userId, onOrderDraftChange, resetTrigger, disabled }) => {
       </div>
 
       <ul className="list-group" style={listStyle}>
-        {foods.map((food, index) => (
-          <li
-            key={index}
-            className="list-group-item d-flex justify-content-between align-items-center"
-          >
+        {foods.map((food, idx) => (
+          <li key={idx} className="list-group-item d-flex justify-content-between align-items-center">
             <div>
               <strong>{food.name}</strong>
               <div className="text-muted small">₱{food.price}</div>
@@ -123,23 +149,23 @@ const MenuUser = ({ userId, onOrderDraftChange, resetTrigger, disabled }) => {
             <div className="d-flex align-items-center">
               <button
                 className="btn btn-sm btn-outline-secondary me-2"
-                onClick={() => decrement(food)}
-                disabled={disabled}
+                onClick={() => handleDecrement(food)}
+                disabled={isDisabled}
               >
                 -
               </button>
-              <span className="me-2">{getQty(food)}</span>
+              <span className="me-2">{getQty(food.name)}</span>
               <button
                 className="btn btn-sm btn-outline-success me-3"
-                onClick={() => increment(food)}
-                disabled={disabled}
+                onClick={() => handleIncrement(food)}
+                disabled={isDisabled}
               >
                 +
               </button>
               <button
                 className="btn btn-sm btn-danger"
-                onClick={() => removeFromOrder(food)}
-                disabled={disabled}
+                onClick={() => handleRemove(food)}
+                disabled={isDisabled}
               >
                 <i className="fas fa-trash"></i>
               </button>
@@ -147,15 +173,13 @@ const MenuUser = ({ userId, onOrderDraftChange, resetTrigger, disabled }) => {
           </li>
         ))}
       </ul>
-      <br></br>
-      {disabled && (
-        <div className="alert alert-warning text-center py-2 mb-3">
-          Ordering is closed — the cut-off time has passed.
+
+      {isDisabled && (
+        <div className="alert alert-warning text-center py-2 mt-3">
+          Ordering is closed.
         </div>
       )}
-
     </div>
-
   );
 };
 
